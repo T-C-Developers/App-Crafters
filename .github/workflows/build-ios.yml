@@ -25,6 +25,9 @@ jobs:
           sudo gem install cocoapods
           pod setup
 
+      - name: Verify Podfile exists
+        run: ls -la iosApp/
+
       - name: Install dependencies
         run: |
           cd iosApp
