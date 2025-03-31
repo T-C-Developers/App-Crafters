@@ -1,13 +1,13 @@
-package com.example.appcrafters.ui.home
+package com.example.appcrafters.ui.blogs
 
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 
-class HomeViewModel : ViewModel() {
+class BlogsViewModel : ViewModel() {
 
     private val _text = MutableLiveData<String>().apply {
-        value = "This is home Fragment"
+        value = "This is blogs Fragment"
     }
     val text: LiveData<String> = _text
 }

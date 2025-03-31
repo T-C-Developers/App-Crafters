@@ -3,23 +3,30 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/mobile_navigation"
-    app:startDestination="@+id/nav_home">
+    app:startDestination="@+id/nav_contacts">
 
     <fragment
-        android:id="@+id/nav_home"
-        android:name="com.example.appcrafters.ui.home.HomeFragment"
-        android:label="@string/menu_home"
-        tools:layout="@layout/fragment_home" />
+        android:id="@+id/nav_contacts"
+        android:name="com.example.appcrafters.ui.contacts.ContactsFragment"
+        android:label="@string/menu_contacts"
+        tools:layout="@layout/fragment_contacts" />
 
     <fragment
-        android:id="@+id/nav_gallery"
-        android:name="com.example.appcrafters.ui.gallery.GalleryFragment"
-        android:label="@string/menu_gallery"
-        tools:layout="@layout/fragment_gallery" />
+        android:id="@+id/nav_groups"
+        android:name="com.example.appcrafters.ui.groups.GroupsFragment"
+        android:label="@string/menu_groups"
+        tools:layout="@layout/fragment_groups" />
 
     <fragment
-        android:id="@+id/nav_slideshow"
-        android:name="com.example.appcrafters.ui.slideshow.SlideshowFragment"
-        android:label="@string/menu_slideshow"
-        tools:layout="@layout/fragment_slideshow" />
+        android:id="@+id/nav_blogs"
+        android:name="com.example.appcrafters.ui.blogs.BlogsFragment"
+        android:label="@string/menu_blogs"
+        tools:layout="@layout/fragment_blogs" />
+
+    <fragment
+        android:id="@+id/nav_settings"
+        android:name="com.example.appcrafters.ui.settings.SettingsFragment"
+        android:label="@string/menu_settings"
+        tools:layout="@layout/fragment_settings" />
+
 </navigation>
