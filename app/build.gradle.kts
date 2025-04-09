@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "com.example.appcrafters"
+    namespace = "com.example.quickconnect"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.example.appcrafters"
+        applicationId = "com.example.quickconnect"
         minSdk = 28
         targetSdk = 35
         versionCode = 1
@@ -27,22 +27,20 @@ android {
             )
         }
     }
-
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-
     kotlinOptions {
         jvmTarget = "17"
     }
-
     buildFeatures {
         viewBinding = true
     }
 }
 
 dependencies {
+
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
