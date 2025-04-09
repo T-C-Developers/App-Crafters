@@ -3,30 +3,31 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/mobile_navigation"
-    app:startDestination="@+id/nav_contacts">
+    app:startDestination="@+id/nav_chats">
 
     <fragment
-        android:id="@+id/nav_contacts"
-        android:name="com.example.appcrafters.ui.contacts.ContactsFragment"
-        android:label="@string/menu_contacts"
-        tools:layout="@layout/fragment_contacts" />
+        android:id="@+id/nav_chats"
+        android:name="com.example.quickconnect.ui.chats.ChatsFragment"
+        android:label="@string/title_chats"
+        tools:layout="@layout/fragment_chats" />
 
     <fragment
         android:id="@+id/nav_groups"
-        android:name="com.example.appcrafters.ui.groups.GroupsFragment"
-        android:label="@string/menu_groups"
+        android:name="com.example.quickconnect.ui.groups.GroupsFragment"
+        android:label="@string/title_groups"
         tools:layout="@layout/fragment_groups" />
 
     <fragment
-        android:id="@+id/nav_blogs"
-        android:name="com.example.appcrafters.ui.blogs.BlogsFragment"
-        android:label="@string/menu_blogs"
-        tools:layout="@layout/fragment_blogs" />
+        android:id="@+id/nav_settings"
+        android:name="com.example.quickconnect.ui.settings.SettingsFragment"
+        android:label="@string/title_settings"
+        tools:layout="@layout/fragment_settings" />
 
     <fragment
-        android:id="@+id/nav_settings"
-        android:name="com.example.appcrafters.ui.settings.SettingsFragment"
-        android:label="@string/menu_settings"
-        tools:layout="@layout/fragment_settings" />
+        android:id="@+id/nav_blogs"
+        android:name="com.example.quickconnect.ui.blogs.BlogsFragment"
+        android:label="@string/title_blogs"
+        tools:layout="@layout/fragment_blogs" />
+
 
 </navigation>

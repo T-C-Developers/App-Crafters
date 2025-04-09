@@ -19,6 +19,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "AppCrafters"
+rootProject.name = "Quick Connect"
 include(":app")
  

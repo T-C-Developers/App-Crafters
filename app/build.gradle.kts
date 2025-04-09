@@ -1,14 +1,15 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.jetbrains.kotlin.android)
+    id("kotlin-kapt") //  Added for Room annotation processing
 }
 
 android {
-    namespace = "com.example.appcrafters"
+    namespace = "com.example.quickconnect"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.example.appcrafters"
+        applicationId = "com.example.quickconnect"
         minSdk = 28
         targetSdk = 35
         versionCode = 1
@@ -48,6 +49,13 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
     implementation(libs.androidx.navigation.fragment.ktx)
     implementation(libs.androidx.navigation.ui.ktx)
+
+    // Room dependencies
+    implementation(libs.androidx.room.runtime)
+    kapt(libs.androidx.room.compiler)
+    implementation(libs.androidx.room.ktx)
+
+    // Testing
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
