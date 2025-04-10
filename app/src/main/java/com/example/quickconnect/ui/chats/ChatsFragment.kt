@@ -4,39 +4,54 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.TextView
+import android.widget.ImageButton
+import android.widget.Toast
 import androidx.fragment.app.Fragment
-import androidx.lifecycle.ViewModelProvider
-import com.example.quickconnect.databinding.FragmentChatsBinding
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import com.example.quickconnect.BluetoothHelper
+import com.example.quickconnect.R
 
 class ChatsFragment : Fragment() {
 
-    private var _binding: FragmentChatsBinding? = null
+    private lateinit var recyclerView: RecyclerView
+    private lateinit var connectButton: ImageButton
+    private val chatAdapter = ChatAdapter(getSampleChats())
+    private lateinit var bluetoothHelper: BluetoothHelper
 
-    // This property is only valid between onCreateView and
-    // onDestroyView.
-    private val binding get() = _binding!!
+    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
+        val view = inflater.inflate(R.layout.fragment_chats, container, false)
 
-    override fun onCreateView(
-        inflater: LayoutInflater,
-        container: ViewGroup?,
-        savedInstanceState: Bundle?
-    ): View {
-        val homeViewModel =
-            ViewModelProvider(this).get(ChatsViewModel::class.java)
+        bluetoothHelper = BluetoothHelper(requireContext())
+        recyclerView = view.findViewById(R.id.chatList)
+        connectButton = view.findViewById(R.id.btnConnect)
 
-        _binding = FragmentChatsBinding.inflate(inflater, container, false)
-        val root: View = binding.root
+        recyclerView.layoutManager = LinearLayoutManager(requireContext())
+        recyclerView.adapter = chatAdapter
 
-        val textView: TextView = binding.textHome
-        homeViewModel.text.observe(viewLifecycleOwner) {
-            textView.text = it
+        connectButton.setOnClickListener {
+            bluetoothHelper.makeDiscoverable(requireActivity())
+            bluetoothHelper.startDiscovery()
+            Toast.makeText(requireContext(), "Searching for nearby devices...", Toast.LENGTH_SHORT).show()
         }
-        return root
+
+        return view
     }
 
-    override fun onDestroyView() {
-        super.onDestroyView()
-        _binding = null
+    private fun getSampleChats(): List<ChatItem> {
+//        [TODO] - Get data from DB
+        return listOf(
+            ChatItem("Cameron Williamson", "Sure! That sounds good.", "11:45 AM"),
+            ChatItem("Jenny Wilson", "Are you coming today?", "10:30 AM"),
+            ChatItem("Kristin Watson", "See you soon!", "Yesterday"),
+            ChatItem("Esther Howard", "I'll send the report", "Yesterday"),
+            ChatItem("Jenny Wilson", "Are you coming today?", "10:30 AM"),
+            ChatItem("Kristin Watson", "See you soon!", "Yesterday"),
+            ChatItem("Esther Howard", "I'll send the report", "Yesterday"),
+            ChatItem("Jenny Wilson", "Are you coming today?", "10:30 AM"),
+            ChatItem("Kristin Watson", "See you soon!", "Yesterday"),
+            ChatItem("Esther Howard", "I'll send the report", "Yesterday"),
+            ChatItem("Wade Warren", "Please call me when...", "Sunday")
+        )
     }
 }
