@@ -1,4 +1,4 @@
-package com.example.appcrafters.data
+package com.example.quickconnect.data
 
 import android.content.Context
 import androidx.room.Database

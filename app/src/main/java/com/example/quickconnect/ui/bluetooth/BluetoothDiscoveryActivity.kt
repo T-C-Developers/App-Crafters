@@ -18,8 +18,6 @@ import androidx.core.app.ActivityCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.quickconnect.databinding.ActivityBluetoothDiscoveryBinding
 
-private const val TAG = "BT_Discovery"
-
 class BluetoothDiscoveryActivity : AppCompatActivity(), DeviceAdapter.OnDeviceClickListener {
 
     private lateinit var binding: ActivityBluetoothDiscoveryBinding
@@ -131,7 +129,7 @@ class BluetoothDiscoveryActivity : AppCompatActivity(), DeviceAdapter.OnDeviceCl
         if (!canScan()) { Toast.makeText(this, "Missing scan permission", Toast.LENGTH_SHORT).show(); return }
         if (btAdapter.isDiscovering) btAdapter.cancelDiscovery()
         val ok = btAdapter.startDiscovery();
-        android.util.Log.d(TAG, "startDiscovery() returned $ok")
+        android.util.Log.d("BT_Discovery", "startDiscovery() returned $ok")
     }
 
     private fun addDevice(d: BluetoothDevice) {
