@@ -28,7 +28,7 @@
             android:id="@+id/btnConnect"
             android:layout_width="40dp"
             android:layout_height="40dp"
-            android:src="@drawable/icon_add"
+            android:src="@drawable/icon_plus"
             android:background="@drawable/circle_background"
             android:layout_alignParentEnd="true"
             android:layout_centerVertical="true"

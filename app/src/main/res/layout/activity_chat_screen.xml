@@ -1,0 +1,71 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <!-- Toolbar -->
+    <androidx.appcompat.widget.Toolbar
+        android:id="@+id/toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#F2F2F2"
+        android:minHeight="?attr/actionBarSize" />
+
+    <!-- Messages -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvMessages"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:padding="4dp" />
+
+    <!-- Composer -->
+    <LinearLayout
+        android:id="@+id/composeBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="8dp"
+        android:gravity="center_vertical">
+
+        <!-- plus / attach -->
+        <ImageButton
+            android:id="@+id/btnAttach"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:src="@drawable/icon_plus"
+            android:background="@android:color/transparent"
+            app:tint="#9E9E9E" />
+
+        <!-- rounded input that grows until 6 lines, then scrolls -->
+        <EditText
+            android:id="@+id/etMessage"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:importantForAutofill="no"
+            android:minHeight="40dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_message_input"
+            android:hint="@string/message"
+            android:gravity="center_vertical|start"
+            android:inputType="textMultiLine|textCapSentences"
+            android:maxLines="6"
+            android:scrollbars="vertical"
+            android:overScrollMode="ifContentScrolls"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp" />
+
+        <!-- send button -->
+        <ImageButton
+            android:id="@+id/btnSend"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_marginStart="6dp"
+            android:src="@drawable/icon_send"
+            android:background="@drawable/bg_send_btn"
+            android:scaleType="center"
+            android:padding="0dp"
+            app:tint="#FFFFFF" />
+    </LinearLayout>
+</LinearLayout>

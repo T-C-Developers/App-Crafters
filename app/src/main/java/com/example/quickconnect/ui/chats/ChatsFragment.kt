@@ -37,6 +37,14 @@ class ChatsFragment : Fragment(), BluetoothService.Callback {
         recyclerView.layoutManager = LinearLayoutManager(requireContext())
         recyclerView.adapter = chatAdapter
 
+        chatAdapter.setOnChatClick { chat ->
+            val intent = Intent(requireContext(), ChatScreenActivity::class.java)
+            intent.putExtra("currentUserId", "me")          // TODO replace with real ID
+            intent.putExtra("peerId", chat.name)              // TODO map name -> userId in DB
+            intent.putExtra("peerName", chat.name)
+            startActivity(intent)
+        }
+
         connectButton.setOnClickListener {
             val intent = Intent(requireContext(), BluetoothDiscoveryActivity::class.java)
             startActivity(intent)
@@ -48,10 +56,9 @@ class ChatsFragment : Fragment(), BluetoothService.Callback {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         service = BluetoothService(requireContext(), this)
-        service.startServer()          // always listen for incoming
+        service.startServer()
     }
 
-    /*  Button "+" pressed  */
     private fun openDiscovery() {
         devicePicker.launch(Intent(requireContext(), BluetoothDiscoveryActivity::class.java))
     }
@@ -61,8 +68,8 @@ class ChatsFragment : Fragment(), BluetoothService.Callback {
         Toast.makeText(requireContext(), "Connected to ${device.name}", Toast.LENGTH_SHORT).show()
     }
     override fun onConnectionFailed() { Toast.makeText(requireContext(), "Connection failed", Toast.LENGTH_SHORT).show() }
-    override fun onMessageRead(message: String) { /* update UI */ }
-    override fun onMessageWritten(message: String) { /* update UI */ }
+    override fun onMessageRead(message: String) {}
+    override fun onMessageWritten(message: String) {}
 
     override fun onDestroy() { super.onDestroy(); service.stop() }
 
@@ -71,9 +78,9 @@ class ChatsFragment : Fragment(), BluetoothService.Callback {
     private fun getSampleChats(): List<ChatItem> {
         // [TODO] - Get data from DB
         return listOf(
-            ChatItem("Cameron Williamson", "Sure! That sounds good.", "11:45 AM"),
-            ChatItem("Jenny Wilson", "Are you coming today?", "10:30 AM"),
-            ChatItem("Kristin Watson", "See you soon!", "Yesterday"),
+            ChatItem("Cameron", "Sure! That sounds good.", "11:45 AM"),
+            ChatItem("Jenny", "Are you coming today?", "10:30 AM"),
+            ChatItem("Kristin", "See you soon!", "Yesterday"),
             ChatItem("Esther Howard", "I'll send the report", "Yesterday"),
             ChatItem("Jenny Wilson", "Are you coming today?", "10:30 AM"),
             ChatItem("Kristin Watson", "See you soon!", "Yesterday"),

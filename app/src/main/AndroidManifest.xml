@@ -32,6 +32,7 @@
             </intent-filter>
         </activity>
         <activity android:name=".ui.bluetooth.BluetoothDiscoveryActivity" />
+        <activity android:name=".ui.chats.ChatScreenActivity" android:exported="false" />
 
     </application>
 
