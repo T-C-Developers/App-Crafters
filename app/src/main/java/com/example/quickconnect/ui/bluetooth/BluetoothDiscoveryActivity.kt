@@ -133,11 +133,30 @@ class BluetoothDiscoveryActivity : AppCompatActivity(), DeviceAdapter.OnDeviceCl
     }
 
     private fun addDevice(d: BluetoothDevice) {
-        if (d.bondState == BluetoothDevice.BOND_BONDED) {
-            if (!paired.contains(d)) { paired += d; pairedAdapter.notifyItemInserted(paired.lastIndex) }
-        } else if (!available.contains(d)) {
-            available += d; availAdapter.notifyItemInserted(available.lastIndex)
+        val name = d.name
+
+        // Filter unnamed devices
+        if (name.isNullOrBlank()) {
+            android.util.Log.d("BT_Discovery", "Ignored unnamed device: ${d.address}")
+            return
         }
+
+        if (d.bondState == BluetoothDevice.BOND_BONDED) {
+            if (!paired.contains(d)) {
+                paired += d
+                pairedAdapter.notifyItemInserted(paired.lastIndex)
+            }
+        } else if (!available.contains(d)) {
+            available += d
+            availAdapter.notifyItemInserted(available.lastIndex)
+        }
+    }
+
+    private fun refreshPairedDevices() {
+        if (!canConnect()) return
+        paired.clear()
+        paired += btAdapter.bondedDevices
+        pairedAdapter.notifyDataSetChanged()
     }
 
     /* ---------- click ---------- */
@@ -148,6 +167,27 @@ class BluetoothDiscoveryActivity : AppCompatActivity(), DeviceAdapter.OnDeviceCl
         } else {
             setResult(RESULT_OK, Intent().putExtra("device", device)); finish()
         }
+    }
+
+    override fun onUnpairClick(device: BluetoothDevice) {
+        AlertDialog.Builder(this)
+            .setTitle("Unpair device")
+            .setMessage("Are you sure you want to unpair ${device.name}?")
+            .setPositiveButton("Yes") { _, _ ->
+                try {
+                    val method = device.javaClass.getMethod("removeBond")
+                    method.invoke(device)
+                    Toast.makeText(this, "Unpairing ${device.name}", Toast.LENGTH_SHORT).show()
+
+                    // Delay refresh slightly to let system update
+                    binding.root.postDelayed({ refreshPairedDevices() }, 1000)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    Toast.makeText(this, "Failed to unpair", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     /* ---------- cleanup ---------- */

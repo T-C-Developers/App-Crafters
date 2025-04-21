@@ -6,5 +6,5 @@ data class ChatMessage(
     val text: String,
     val timestamp: Long,        // epoch millis
     val isSentByMe: Boolean,    // true = outgoing, false = incoming
-    val isRead: Boolean         // only used for outgoing msgs
+    val isRead: Boolean = false         // only used for outgoing msgs
 )

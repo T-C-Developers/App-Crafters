@@ -24,8 +24,8 @@ class ChatScreenActivity : AppCompatActivity(), BluetoothService.Callback {
     private lateinit var bluetoothService: BluetoothService
 
     /** The id of *this* user and the peer, passed in the Intent */
-    private val currentUserId by lazy { intent.getStringExtra("currentUserId") ?: "" }
-    private val peerId        by lazy { intent.getStringExtra("peerId") ?: "" }
+    private val currentUserId by lazy { intent.getStringExtra("currentUserId") ?: "" }      // currentUserId = me,  for now
+    private val peerId        by lazy { intent.getStringExtra("peerId") ?: "" }             // peerId = peerName, for now
     private val peerName      by lazy { intent.getStringExtra("peerName") ?: "Unknown" }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -82,10 +82,10 @@ class ChatScreenActivity : AppCompatActivity(), BluetoothService.Callback {
         if (text.isEmpty()) return
         val now = System.currentTimeMillis()
 
-        /* Optimistic UI update */
+        /* UI update */
         messageAdapter.add(ChatMessage(text = text, timestamp = now, isSentByMe = true, isRead = false))
         rvMessages.scrollToPosition(messageAdapter.itemCount - 1)
-        etMessage.setText("")
+        etMessage.setText("")       // clear msg typing box
 
         /* Save locally + send */
         lifecycleScope.launch(Dispatchers.IO) {
@@ -106,12 +106,12 @@ class ChatScreenActivity : AppCompatActivity(), BluetoothService.Callback {
 
     /* ---------- BluetoothService.Callback ---------- */
     override fun onConnected(device: android.bluetooth.BluetoothDevice) {}
-    override fun onConnectionFailed() {}
+    override fun onConnectionFailed() {}            // [TODO] - handel this later
 
     override fun onMessageRead(message: String) {
         val now = System.currentTimeMillis()
         runOnUiThread {
-            messageAdapter.add(ChatMessage(text = message, timestamp = now, isSentByMe = false, isRead = false))
+            messageAdapter.add(ChatMessage(text = message, timestamp = now, isSentByMe = false))
             rvMessages.scrollToPosition(messageAdapter.itemCount - 1)
         }
         lifecycleScope.launch(Dispatchers.IO) {
@@ -127,6 +127,7 @@ class ChatScreenActivity : AppCompatActivity(), BluetoothService.Callback {
                     )
                 )
         }
+        // TODO - have to send receipts to other user
     }
     override fun onMessageWritten(message: String) {}
 

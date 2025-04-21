@@ -78,11 +78,11 @@ class ChatsFragment : Fragment(), BluetoothService.Callback {
     private fun getSampleChats(): List<ChatItem> {
         // [TODO] - Get data from DB
         return listOf(
-            ChatItem("Cameron", "Sure! That sounds good.", "11:45 AM"),
-            ChatItem("Jenny", "Are you coming today?", "10:30 AM"),
+            ChatItem("Cameron", "Sure! That sounds good.", "Yesterday"),
+            ChatItem("Jenny", "Are you coming today?", "Yesterday"),
             ChatItem("Kristin", "See you soon!", "Yesterday"),
             ChatItem("Esther Howard", "I'll send the report", "Yesterday"),
-            ChatItem("Jenny Wilson", "Are you coming today?", "10:30 AM"),
+            ChatItem("Jenny Wilson", "Are you coming today?", "Yesterday"),
             ChatItem("Kristin Watson", "See you soon!", "Yesterday"),
             ChatItem("Esther Howard", "I'll send the report", "Yesterday"),
             ChatItem("Jenny Wilson", "Are you coming today?", "10:30 AM"),
