@@ -37,7 +37,7 @@ class ChatAdapter : ListAdapter<ChatItem, ChatAdapter.ChatViewHolder>(ChatDiffCa
         holder.message.text = item.message
         holder.time.text = item.time
         // [TODO] - use placeholder image
-        holder.image.setImageResource(R.drawable.img_profile)
+//        holder.image.setImageResource(R.drawable.img_profile)
         holder.itemView.setOnClickListener { listener?.onChat(item) }
     }
 
