@@ -9,6 +9,7 @@ import android.location.LocationManager
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.view.MenuItem
 import android.view.View
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -16,6 +17,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.example.quickconnect.R
 import com.example.quickconnect.databinding.ActivityBluetoothDiscoveryBinding
 
 class BluetoothDiscoveryActivity : AppCompatActivity(), DeviceAdapter.OnDeviceClickListener {
@@ -96,6 +98,11 @@ class BluetoothDiscoveryActivity : AppCompatActivity(), DeviceAdapter.OnDeviceCl
         super.onCreate(savedInstanceState)
         binding = ActivityBluetoothDiscoveryBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        /* Toolbar */
+        setSupportActionBar(findViewById(R.id.bluetooth_toolbar))
+        supportActionBar?.setDisplayHomeAsUpEnabled(true)
+        supportActionBar?.title = "Bluetooth"
 
         pairedAdapter = DeviceAdapter(paired, this)
         availAdapter  = DeviceAdapter(available, this)
@@ -189,6 +196,18 @@ class BluetoothDiscoveryActivity : AppCompatActivity(), DeviceAdapter.OnDeviceCl
             .setNegativeButton("Cancel", null)
             .show()
     }
+
+    // toolbar - back button functionality.
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            android.R.id.home -> {
+                onBackPressedDispatcher.onBackPressed()
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
+        }
+    }
+
 
     /* ---------- cleanup ---------- */
     override fun onDestroy() {
