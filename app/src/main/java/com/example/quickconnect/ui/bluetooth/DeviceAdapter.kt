@@ -9,6 +9,7 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
+import com.example.quickconnect.R
 import com.example.quickconnect.databinding.ItemDeviceBinding
 
 class DeviceAdapter(
@@ -40,9 +41,28 @@ class DeviceAdapter(
             binding.deviceAddress.text = address
             binding.btnUnpair.visibility = if (device.bondState == BluetoothDevice.BOND_BONDED) View.VISIBLE else View.GONE
 
-            binding.root.setOnClickListener { listener.onDeviceClick(device) }
-            binding.btnUnpair.setOnClickListener { listener.onUnpairClick(device) }
+            if (device.bondState == BluetoothDevice.BOND_NONE) {
+                // if not paired connect them.
+                binding.root.setOnClickListener { listener.onDeviceClick(device) }
+            } else {
+                // if paired, there should be unpair functionality.
+//                binding.root.setOnClickListener(null) // disable click for paired
+                binding.btnUnpair.setOnClickListener { listener.onUnpairClick(device) }
+                binding.deviceStatus.visibility = View.VISIBLE
+                binding.deviceStatus.text = if (isConnected(device)) "Connected" else "Not connected"
+                binding.deviceStatus.setTextColor(
+                    ContextCompat.getColor(
+                        ctx,
+                        if (isConnected(device)) R.color.green_600 else R.color.red_600
+                    )
+                )
+            }
         }
+    }
+
+    // TODO - Import from bluetooth and use (later)
+    fun isConnected(device: BluetoothDevice): Boolean {
+        return true;
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): DeviceViewHolder {

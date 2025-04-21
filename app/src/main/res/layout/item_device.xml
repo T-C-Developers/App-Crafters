@@ -11,35 +11,48 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:padding="16dp"
+        android:padding="12dp"
         android:gravity="center_vertical"
         android:baselineAligned="false">
 
-        <!-- Name & Address -->
+        <!-- Left: Info Block -->
         <LinearLayout
             android:layout_width="0dp"
             android:layout_weight="1"
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
+            <!-- Device Name -->
             <TextView
                 android:id="@+id/deviceName"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Device Name"
+                android:text="@string/device_name"
                 android:textSize="16sp"
                 android:textStyle="bold" />
 
+            <!-- Device Address -->
             <TextView
                 android:id="@+id/deviceAddress"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="00:11:22:33:AA:BB"
+                android:text="@string/eg_mac_address"
                 android:textSize="14sp"
                 android:textColor="#777" />
+
+            <!-- Connection Status -->
+            <TextView
+                android:id="@+id/deviceStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/status_not_connected"
+                android:textSize="13sp"
+                android:textColor="#FF5722"
+                android:layout_marginTop="4dp"
+                android:visibility="gone" />
         </LinearLayout>
 
-        <!-- Unpair Button -->
+        <!-- Right: Unpair Button -->
         <Button
             android:id="@+id/btnUnpair"
             android:layout_width="wrap_content"
@@ -48,4 +61,5 @@
             android:visibility="gone"
             android:layout_marginStart="16dp" />
     </LinearLayout>
+
 </androidx.cardview.widget.CardView>

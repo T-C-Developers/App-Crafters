@@ -13,4 +13,9 @@
     <string name="available_devices">Available devices</string>
     <string name="search">Search</string>
     <string name="no_chats_found">😕 No chats found</string>
+    <string name="eg_mac_address">00:11:22:33:AA:BB</string>
+    <string name="status_connected">Connected</string>
+    <string name="status_not_connected">Not connected</string>
+    <string name="status_connecting">Connecting</string>
+    <string name="device_name">Device Name</string>
 </resources>
