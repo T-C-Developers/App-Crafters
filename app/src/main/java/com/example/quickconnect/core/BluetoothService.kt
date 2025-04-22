@@ -8,6 +8,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import androidx.annotation.RequiresPermission
 import androidx.core.app.ActivityCompat
 import java.io.IOException
 import java.io.InputStream
@@ -40,7 +41,7 @@ class BluetoothService(private val context: Context, private val callback: Callb
     private val adapter: BluetoothAdapter = BluetoothAdapter.getDefaultAdapter()
     private var acceptThread: AcceptThread? = null
     private var connectThread: ConnectThread? = null
-    private var connectedThread: ConnectedThread? = null
+    private val connectedThreads = mutableMapOf<String, ConnectedThread>() // address -> thread
 
     /* ---------------- public API ---------------- */
     fun startServer() {
@@ -64,15 +65,26 @@ class BluetoothService(private val context: Context, private val callback: Callb
         connectThread = ConnectThread(device).also { it.start() }
     }
 
-    fun write(bytes: ByteArray) {
-        connectedThread?.write(bytes)
+    fun writeBroadcast(bytes: ByteArray) {
+        connectedThreads.values.forEach { it.write(bytes) }
+    }
+
+    fun write(device: BluetoothDevice, bytes: ByteArray) {
+        connectedThreads[device.address]?.write(bytes)
     }
 
     fun stop() {
         acceptThread?.cancel(); acceptThread = null
         connectThread?.cancel(); connectThread = null
-        connectedThread?.cancel(); connectedThread = null
+        connectedThreads.values.forEach { it.cancel() }
+        connectedThreads.clear()
     }
+
+    fun disconnect(device: BluetoothDevice) {
+        connectedThreads.remove(device.address)?.cancel()
+    }
+
+
 
     /* ---------------- internal threads ---------------- */
     private inner class AcceptThread : Thread() {
@@ -108,6 +120,7 @@ class BluetoothService(private val context: Context, private val callback: Callb
                 Log.e(TAG_SERVICE, "createRfcommSocket requires BLUETOOTH_CONNECT", e)
             }
         }
+        @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
         override fun run() {
             if (socket == null) { callback.onConnectionFailed(); return }
             if (hasScanPerm() && adapter.isDiscovering) adapter.cancelDiscovery()
@@ -123,10 +136,44 @@ class BluetoothService(private val context: Context, private val callback: Callb
         fun cancel() { try { socket?.close() } catch (_: IOException) {} }
     }
 
+    // handle multiple Bluetooth devices
     private fun manageConnection(socket: BluetoothSocket) {
-        connectedThread?.cancel()
-        connectedThread = ConnectedThread(socket).also { it.start() }
+        val address = socket.remoteDevice.address
+
+        connectedThreads[address]?.cancel()
+        val thread = ConnectedThread(socket)
+        connectedThreads[address] = thread
+        thread.start()
+
         callback.onConnected(socket.remoteDevice)
+    }
+
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
+    fun isConnectedTo(context: Context, device: BluetoothDevice): Boolean {
+        if (connectedThreads.containsKey(device.address)) return true
+
+        val manager = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
+        val connectedDevices = mutableListOf<BluetoothDevice>()
+
+        try {
+            connectedDevices += manager.getConnectedDevices(BluetoothProfile.GATT)
+        } catch (e: IllegalArgumentException) {
+            e.printStackTrace()
+        }
+
+        try {
+            connectedDevices += manager.getConnectedDevices(BluetoothProfile.HEADSET)
+        } catch (e: IllegalArgumentException) {
+            e.printStackTrace()
+        }
+
+        try {
+            connectedDevices += manager.getConnectedDevices(BluetoothProfile.A2DP)
+        } catch (e: IllegalArgumentException) {
+            e.printStackTrace()
+        }
+
+        return connectedDevices.any { it.address == device.address }
     }
 
     private inner class ConnectedThread(private val socket: BluetoothSocket) : Thread() {

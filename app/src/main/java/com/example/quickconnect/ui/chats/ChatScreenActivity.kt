@@ -1,8 +1,10 @@
 package com.example.quickconnect.ui.chats
 
+import android.bluetooth.BluetoothDevice
 import android.os.Bundle
 import android.widget.EditText
 import android.widget.ImageButton
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -22,6 +24,7 @@ class ChatScreenActivity : AppCompatActivity(), BluetoothService.Callback {
     private lateinit var rvMessages: RecyclerView
     private lateinit var etMessage: EditText
     private lateinit var bluetoothService: BluetoothService
+    private var connectedDevice: BluetoothDevice? = null
 
     /** The id of *this* user and the peer, passed in the Intent */
     private val currentUserId by lazy { intent.getStringExtra("currentUserId") ?: "" }      // currentUserId = me,  for now
@@ -101,12 +104,21 @@ class ChatScreenActivity : AppCompatActivity(), BluetoothService.Callback {
                     )
                 )
         }
-        bluetoothService.write(text.toByteArray())
+
+        connectedDevice?.let {
+            bluetoothService.write(it, text.toByteArray())
+        } ?:
+            Toast.makeText(this, "Not connected to peer", Toast.LENGTH_SHORT).show()
     }
 
     /* ---------- BluetoothService.Callback ---------- */
-    override fun onConnected(device: android.bluetooth.BluetoothDevice) {}
-    override fun onConnectionFailed() {}            // [TODO] - handel this later
+    override fun onConnected(device: BluetoothDevice) {
+        connectedDevice = device
+    }
+
+    override fun onConnectionFailed() {
+        Toast.makeText(this, "Bluetooth connection failed", Toast.LENGTH_SHORT).show()
+    }
 
     override fun onMessageRead(message: String) {
         val now = System.currentTimeMillis()
@@ -129,7 +141,11 @@ class ChatScreenActivity : AppCompatActivity(), BluetoothService.Callback {
         }
         // TODO - have to send receipts to other user
     }
+
     override fun onMessageWritten(message: String) {}
 
-    override fun onSupportNavigateUp(): Boolean { finish(); return true }
+    override fun onSupportNavigateUp(): Boolean {
+        finish()
+        return true
+    }
 }

@@ -14,7 +14,8 @@ import com.example.quickconnect.databinding.ItemDeviceBinding
 
 class DeviceAdapter(
     private val deviceList: List<BluetoothDevice>,
-    private val listener: OnDeviceClickListener
+    private val listener: OnDeviceClickListener,
+    private val isConnected: (BluetoothDevice) -> Boolean
 ) : RecyclerView.Adapter<DeviceAdapter.DeviceViewHolder>() {
 
     interface OnDeviceClickListener {
@@ -58,11 +59,6 @@ class DeviceAdapter(
                 )
             }
         }
-    }
-
-    // TODO - Import from bluetooth and use (later)
-    fun isConnected(device: BluetoothDevice): Boolean {
-        return true;
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): DeviceViewHolder {

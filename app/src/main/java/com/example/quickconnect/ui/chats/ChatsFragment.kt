@@ -77,6 +77,7 @@ class ChatsFragment : Fragment(), BluetoothService.Callback {
         return binding.root
     }
 
+    // Message to show when there is no chats
     private fun updateEmptyState(list: List<ChatItem>) {
         binding.emptyView.visibility = if (list.isEmpty()) View.VISIBLE else View.GONE
     }

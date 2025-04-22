@@ -1,6 +1,7 @@
 package com.example.quickconnect.ui.bluetooth
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.content.*
@@ -9,16 +10,20 @@ import android.location.LocationManager
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.util.Log
 import android.view.MenuItem
 import android.view.View
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.RequiresApi
+import androidx.annotation.RequiresPermission
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.quickconnect.R
 import com.example.quickconnect.databinding.ActivityBluetoothDiscoveryBinding
+import com.example.quickconnect.core.BluetoothService
 
 class BluetoothDiscoveryActivity : AppCompatActivity(), DeviceAdapter.OnDeviceClickListener {
 
@@ -30,8 +35,10 @@ class BluetoothDiscoveryActivity : AppCompatActivity(), DeviceAdapter.OnDeviceCl
 
     private lateinit var pairedAdapter: DeviceAdapter
     private lateinit var availAdapter: DeviceAdapter
+    private lateinit var bluetoothService: BluetoothService
 
     /* ---------- permission helpers ---------- */
+    @RequiresApi(Build.VERSION_CODES.S)
     private val permsS = arrayOf(
         Manifest.permission.BLUETOOTH_SCAN,
         Manifest.permission.BLUETOOTH_CONNECT,
@@ -49,11 +56,49 @@ class BluetoothDiscoveryActivity : AppCompatActivity(), DeviceAdapter.OnDeviceCl
     private fun canScan()    = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || has(Manifest.permission.BLUETOOTH_SCAN)
     private fun canConnect() = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || has(Manifest.permission.BLUETOOTH_CONNECT)
 
-    private val permLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { map ->
-        if (map.all { it.value }) ensureLocationEnabled() else Toast.makeText(this, "Permissions required", Toast.LENGTH_LONG).show()
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
+    private fun initBluetoothAdapters() {
+        bluetoothService = BluetoothService(this, object : BluetoothService.Callback {
+            @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
+            override fun onConnected(device: BluetoothDevice) {
+                Toast.makeText(this@BluetoothDiscoveryActivity, "Connected to ${device.name}", Toast.LENGTH_SHORT).show()
+                refreshPairedDevices()
+            }
+
+            override fun onConnectionFailed() {
+                Toast.makeText(this@BluetoothDiscoveryActivity, "Connection failed", Toast.LENGTH_SHORT).show()
+            }
+
+            override fun onMessageRead(message: String) {}
+            override fun onMessageWritten(message: String) {}
+        })
+
+        pairedAdapter = DeviceAdapter(paired, this) { device ->
+            bluetoothService.isConnectedTo(this, device)
+        }
+
+        availAdapter = DeviceAdapter(available, this) { false }
+
+        binding.pairedList.layoutManager = LinearLayoutManager(this)
+        binding.pairedList.adapter = pairedAdapter
+        binding.newList.layoutManager = LinearLayoutManager(this)
+        binding.newList.adapter = availAdapter
     }
 
+
+//    @SuppressLint("MissingPermission")
+    private val permLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { map ->
+        if (map.all { it.value }) {
+            initBluetoothAdapters()
+            ensureLocationEnabled()
+        } else {
+            Toast.makeText(this, "Permissions required", Toast.LENGTH_LONG).show()
+        }
+    }
+
+
     /* ---------- location helper ---------- */
+    @RequiresPermission(Manifest.permission.BLUETOOTH_SCAN)
     private fun ensureLocationEnabled() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             val lm = getSystemService(LOCATION_SERVICE) as LocationManager
@@ -71,6 +116,8 @@ class BluetoothDiscoveryActivity : AppCompatActivity(), DeviceAdapter.OnDeviceCl
 
     /* ---------- receiver ---------- */
     private val receiver = object : BroadcastReceiver() {
+
+        @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
         override fun onReceive(ctx: Context?, intent: Intent?) {
             when (intent?.action) {
                 BluetoothDevice.ACTION_FOUND -> {
@@ -104,8 +151,37 @@ class BluetoothDiscoveryActivity : AppCompatActivity(), DeviceAdapter.OnDeviceCl
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
         supportActionBar?.title = "Bluetooth"
 
-        pairedAdapter = DeviceAdapter(paired, this)
-        availAdapter  = DeviceAdapter(available, this)
+        val ctx = binding.root.context
+        pairedAdapter = DeviceAdapter(paired, this)   { device ->
+            if (ActivityCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.BLUETOOTH_CONNECT
+                ) == PackageManager.PERMISSION_GRANTED
+            ) {
+                bluetoothService.isConnectedTo(ctx , device)
+            }
+            else{
+                Toast.makeText(this@BluetoothDiscoveryActivity, "Permission Required", Toast.LENGTH_SHORT).show()
+                false
+            }
+        }
+        availAdapter = DeviceAdapter(available, this) { false }
+
+        bluetoothService = BluetoothService(this, object : BluetoothService.Callback {
+            @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
+            override fun onConnected(device: BluetoothDevice) {
+                Toast.makeText(this@BluetoothDiscoveryActivity, "Connected to ${device.name}", Toast.LENGTH_SHORT).show()
+                refreshPairedDevices()
+            }
+
+            override fun onConnectionFailed() {
+                Toast.makeText(this@BluetoothDiscoveryActivity, "Connection failed", Toast.LENGTH_SHORT).show()
+            }
+
+            override fun onMessageRead(message: String) {}
+            override fun onMessageWritten(message: String) {}
+        })
+
 
         binding.pairedList.layoutManager = LinearLayoutManager(this)
         binding.pairedList.adapter      = pairedAdapter
@@ -120,10 +196,17 @@ class BluetoothDiscoveryActivity : AppCompatActivity(), DeviceAdapter.OnDeviceCl
             registerReceiver(receiver, this)
         }
 
-        if (!runtimePerms.all { has(it) }) permLauncher.launch(runtimePerms) else ensureLocationEnabled()
+        if (!runtimePerms.all { has(it) }) {
+            permLauncher.launch(runtimePerms)
+        } else {
+            initBluetoothAdapters()
+            ensureLocationEnabled()
+        }
+
     }
 
     /* ---------- discovery helpers ---------- */
+    @RequiresPermission(Manifest.permission.BLUETOOTH_SCAN)
     private fun initDiscovery() {
         paired.clear(); available.clear()
         if (canConnect()) paired += btAdapter.bondedDevices
@@ -132,19 +215,21 @@ class BluetoothDiscoveryActivity : AppCompatActivity(), DeviceAdapter.OnDeviceCl
         restartDiscovery()
     }
 
+    @RequiresPermission(Manifest.permission.BLUETOOTH_SCAN)
     private fun restartDiscovery() {
         if (!canScan()) { Toast.makeText(this, "Missing scan permission", Toast.LENGTH_SHORT).show(); return }
         if (btAdapter.isDiscovering) btAdapter.cancelDiscovery()
         val ok = btAdapter.startDiscovery();
-        android.util.Log.d("BT_Discovery", "startDiscovery() returned $ok")
+        Log.d("BT_Discovery", "startDiscovery() returned $ok")
     }
 
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     private fun addDevice(d: BluetoothDevice) {
         val name = d.name
 
         // Filter unnamed devices
         if (name.isNullOrBlank()) {
-            android.util.Log.d("BT_Discovery", "Ignored unnamed device: ${d.address}")
+            Log.d("BT_Discovery", "Ignored unnamed device: ${d.address}")
             return
         }
 
@@ -159,6 +244,7 @@ class BluetoothDiscoveryActivity : AppCompatActivity(), DeviceAdapter.OnDeviceCl
         }
     }
 
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     private fun refreshPairedDevices() {
         if (!canConnect()) return
         paired.clear()
@@ -167,6 +253,7 @@ class BluetoothDiscoveryActivity : AppCompatActivity(), DeviceAdapter.OnDeviceCl
     }
 
     /* ---------- click ---------- */
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     override fun onDeviceClick(device: BluetoothDevice) {
         if (device.bondState == BluetoothDevice.BOND_NONE) {
             if (!canConnect()) { Toast.makeText(this, "Need BLUETOOTH_CONNECT", Toast.LENGTH_SHORT).show(); return }
@@ -176,6 +263,7 @@ class BluetoothDiscoveryActivity : AppCompatActivity(), DeviceAdapter.OnDeviceCl
         }
     }
 
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     override fun onUnpairClick(device: BluetoothDevice) {
         AlertDialog.Builder(this)
             .setTitle("Unpair device")
@@ -210,6 +298,7 @@ class BluetoothDiscoveryActivity : AppCompatActivity(), DeviceAdapter.OnDeviceCl
 
 
     /* ---------- cleanup ---------- */
+    @RequiresPermission(Manifest.permission.BLUETOOTH_SCAN)
     override fun onDestroy() {
         super.onDestroy(); try { unregisterReceiver(receiver) } catch (_: Exception) {}
         if (canScan()) btAdapter.cancelDiscovery()
