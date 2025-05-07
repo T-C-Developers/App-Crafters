@@ -1,4 +1,4 @@
-package com.example.appcrafters.data
+package com.example.quickconnect.data
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
@@ -9,5 +9,7 @@ data class DirectMessage(
     val senderId: String,
     val receiverId: String,
     val timestamp: Long,
-    val content: String
-)
+    val content: String,
+    val isRead: Boolean
+) {
+}

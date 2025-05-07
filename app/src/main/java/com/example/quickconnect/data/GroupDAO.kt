@@ -1,4 +1,4 @@
-package com.example.appcrafters.data
+package com.example.quickconnect.data
 
 import androidx.room.Dao
 import androidx.room.Insert
