@@ -28,6 +28,22 @@ interface ProfileDataDAO {
     @Query("UPDATE profile_data SET discoverable = :isDiscoverable")
     suspend fun updateDiscoverableStatus(isDiscoverable: Boolean)
 
+    // Update SoundsNotification Status Only
+    @Query("UPDATE profile_data SET soundNotification = :soundNotification")
+    suspend fun updateSoundNotificationStatus(soundNotification: Boolean)
+
+    // Update vibrationNotification Status Only
+    @Query("UPDATE profile_data SET vibrationNotification = :vibrationNotification")
+    suspend fun updateVibrationNotificationStatus(vibrationNotification: Boolean)
+
+    // Update readReceipts Status Only
+    @Query("UPDATE profile_data SET readReceipts = :readReceipts")
+    suspend fun updateReadReceiptsStatus(readReceipts: Boolean)
+
+    // Update showLastSeen Status Only
+    @Query("UPDATE profile_data SET showLastSeen = :showLastSeen")
+    suspend fun updateShowLastSeenStatus(showLastSeen: Boolean)
+
     // Update Profile Image Path Only
     @Query("UPDATE profile_data SET profileImagePath = :imagePath")
     suspend fun updateProfileImage(imagePath: String)

@@ -10,5 +10,9 @@ data class ProfileData(
     val displayName: String,
     val deviceName: String,
     val discoverable: Boolean,
+    val soundNotification:Boolean,
+    val vibrationNotification:Boolean,
+    val readReceipts:Boolean,
+    val showLastSeen:Boolean,
     val profileImagePath: String? = null  // Store the image file path
 )
