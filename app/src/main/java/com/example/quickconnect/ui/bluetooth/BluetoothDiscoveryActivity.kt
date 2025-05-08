@@ -86,7 +86,7 @@ class BluetoothDiscoveryActivity : AppCompatActivity(), DeviceAdapter.OnDeviceCl
     }
 
 
-//    @SuppressLint("MissingPermission")
+    @SuppressLint("MissingPermission")
     private val permLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { map ->
         if (map.all { it.value }) {
             initBluetoothAdapters()
@@ -100,7 +100,7 @@ class BluetoothDiscoveryActivity : AppCompatActivity(), DeviceAdapter.OnDeviceCl
     /* ---------- location helper ---------- */
     @RequiresPermission(Manifest.permission.BLUETOOTH_SCAN)
     private fun ensureLocationEnabled() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+//        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             val lm = getSystemService(LOCATION_SERVICE) as LocationManager
             if (!lm.isProviderEnabled(LocationManager.GPS_PROVIDER) && !lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
                 AlertDialog.Builder(this)
@@ -110,13 +110,22 @@ class BluetoothDiscoveryActivity : AppCompatActivity(), DeviceAdapter.OnDeviceCl
                     .setNegativeButton("Cancel", null)
                     .show(); return
             }
-        }
+//        }
         initDiscovery()
+    }
+
+    @RequiresPermission(Manifest.permission.BLUETOOTH_ADVERTISE)
+    private fun makeDeviceDiscoverable() {
+        val discoverableIntent = Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE)
+        discoverableIntent.putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 300) // 5 minutes
+        startActivity(discoverableIntent)
+        Toast.makeText(this, "Your device is now discoverable for 5 minutes", Toast.LENGTH_SHORT).show()
     }
 
     /* ---------- receiver ---------- */
     private val receiver = object : BroadcastReceiver() {
 
+        @SuppressLint("MissingPermission", "NotifyDataSetChanged")
         @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
         override fun onReceive(ctx: Context?, intent: Intent?) {
             when (intent?.action) {
@@ -141,6 +150,8 @@ class BluetoothDiscoveryActivity : AppCompatActivity(), DeviceAdapter.OnDeviceCl
     }
 
     /* ---------- lifecycle ---------- */
+    @SuppressLint("MissingPermission", "UnspecifiedRegisterReceiverFlag")
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityBluetoothDiscoveryBinding.inflate(layoutInflater)
@@ -150,6 +161,14 @@ class BluetoothDiscoveryActivity : AppCompatActivity(), DeviceAdapter.OnDeviceCl
         setSupportActionBar(findViewById(R.id.bluetooth_toolbar))
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
         supportActionBar?.title = "Bluetooth"
+
+        if (!runtimePerms.all { has(it) }) {
+            permLauncher.launch(runtimePerms)
+        } else {
+            initBluetoothAdapters()
+            ensureLocationEnabled()
+            makeDeviceDiscoverable()
+        }
 
         val ctx = binding.root.context
         pairedAdapter = DeviceAdapter(paired, this)   { device ->
@@ -206,6 +225,7 @@ class BluetoothDiscoveryActivity : AppCompatActivity(), DeviceAdapter.OnDeviceCl
     }
 
     /* ---------- discovery helpers ---------- */
+    @SuppressLint("MissingPermission", "NotifyDataSetChanged")
     @RequiresPermission(Manifest.permission.BLUETOOTH_SCAN)
     private fun initDiscovery() {
         paired.clear(); available.clear()
@@ -244,6 +264,7 @@ class BluetoothDiscoveryActivity : AppCompatActivity(), DeviceAdapter.OnDeviceCl
         }
     }
 
+    @SuppressLint("NotifyDataSetChanged")
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     private fun refreshPairedDevices() {
         if (!canConnect()) return
@@ -295,7 +316,6 @@ class BluetoothDiscoveryActivity : AppCompatActivity(), DeviceAdapter.OnDeviceCl
             else -> super.onOptionsItemSelected(item)
         }
     }
-
 
     /* ---------- cleanup ---------- */
     @RequiresPermission(Manifest.permission.BLUETOOTH_SCAN)

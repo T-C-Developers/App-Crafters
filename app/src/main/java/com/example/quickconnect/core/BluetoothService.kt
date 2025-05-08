@@ -150,8 +150,12 @@ class BluetoothService(private val context: Context, private val callback: Callb
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     fun isConnectedTo(context: Context, device: BluetoothDevice): Boolean {
-        if (connectedThreads.containsKey(device.address)) return true
+        // Check if this device is in our active connections
+        if (connectedThreads.containsKey(device.address)) {
+            return true
+        }
 
+        // Try to use BluetoothManager for connected profiles
         val manager = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
         val connectedDevices = mutableListOf<BluetoothDevice>()
 
@@ -173,14 +177,24 @@ class BluetoothService(private val context: Context, private val callback: Callb
             e.printStackTrace()
         }
 
+        // Also check if it's connected via our socket threads
+        connectedThreads.values.forEach { thread ->
+            if (thread.device.address == device.address && thread.socket.isConnected) {
+                return true
+            }
+        }
+
         return connectedDevices.any { it.address == device.address }
     }
 
-    private inner class ConnectedThread(private val socket: BluetoothSocket) : Thread() {
+
+    private inner class ConnectedThread(val socket: BluetoothSocket) : Thread() {
+        val device: BluetoothDevice = socket.remoteDevice
         private val inStream: InputStream = socket.inputStream
         private val outStream: OutputStream = socket.outputStream
         private val handler = Handler(Looper.getMainLooper())
 
+        @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
         override fun run() {
             val buffer = ByteArray(1024)
             while (true) {
@@ -189,7 +203,8 @@ class BluetoothService(private val context: Context, private val callback: Callb
                     val msg = String(buffer, 0, bytes)
                     handler.post { callback.onMessageRead(msg) }
                 } catch (e: IOException) {
-                    Log.e(TAG_SERVICE, "Disconnected", e)
+                    Log.e(TAG_SERVICE, "Disconnected from ${device.name}", e)
+                    connectedThreads.remove(device.address)
                     break
                 }
             }
@@ -203,6 +218,13 @@ class BluetoothService(private val context: Context, private val callback: Callb
                 Log.e(TAG_SERVICE, "Write error", e)
             }
         }
-        fun cancel() { try { socket.close() } catch (_: IOException) {} }
+
+        fun cancel() {
+            try {
+                socket.close()
+                connectedThreads.remove(device.address) // Ensure cleanup
+            } catch (_: IOException) {}
+        }
     }
+
 }
