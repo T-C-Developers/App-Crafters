@@ -33,8 +33,7 @@
                 android:layout_width="120dp"
                 android:layout_height="120dp"
                 android:src="@drawable/img_profile"
-                android:scaleType="centerCrop"
-                android:onClick="changeProfilePicture" />
+                android:scaleType="centerCrop" />
 
             <Button
                 android:id="@+id/changeProfilePictureButton"

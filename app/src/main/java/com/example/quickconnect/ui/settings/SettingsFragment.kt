@@ -41,6 +41,7 @@ class SettingsFragment : Fragment() {
         profileDao = database.profileDataDAO()
 
         imageService = ImageService(requireContext())
+        //Todo update userId
         userId = "user_id_12345"
 
         _binding = FragmentSettingsBinding.inflate(inflater, container, false)
@@ -92,7 +93,7 @@ class SettingsFragment : Fragment() {
 
             //remove this part later, Need to save the profileData at the first time logging
             if(profileData==null) {
-                profileDao.insertOrUpdateProfileData(ProfileData(userId, "", "null", true,true,true,true,true, null))
+                profileDao.insertOrUpdateProfileData(ProfileData(userId, ""))
             }
         }
     }
@@ -141,7 +142,7 @@ class SettingsFragment : Fragment() {
             uri?.let {
                 profileImageView.setImageURI(it)
             } ?: run {
-                Toast.makeText(requireContext(), "No profile image found.", Toast.LENGTH_SHORT).show()
+//                Toast.makeText(requireContext(), "No profile image found.", Toast.LENGTH_SHORT).show()
             }
         }
     }

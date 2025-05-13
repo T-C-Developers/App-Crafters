@@ -29,5 +29,11 @@
         android:label="@string/title_blogs"
         tools:layout="@layout/fragment_blogs" />
 
+    <fragment
+        android:id="@+id/registerFragment"
+        android:name="com.example.quickconnect.ui.settings.RegisterFragment"
+        android:label="Register"
+        tools:layout="@layout/fragment_register" />
+
 
 </navigation>
