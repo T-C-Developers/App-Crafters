@@ -21,6 +21,7 @@
     <uses-feature android:name="android.hardware.bluetooth" android:required="true"/>
 
     <application
+        android:name=".QuickConnectApp"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:theme="@style/Theme.QuickConnect"

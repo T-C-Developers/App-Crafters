@@ -3,8 +3,8 @@ package com.example.quickconnect.ui.chats
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
-import com.example.quickconnect.data.User
 import com.example.quickconnect.data.DirectMessage
+import com.example.quickconnect.data.User
 import com.example.quickconnect.databinding.ChatItemBinding
 import java.text.SimpleDateFormat
 import java.util.*
@@ -15,15 +15,16 @@ class ChatAdapter(
     private val onChatClick: (User) -> Unit
 ) : RecyclerView.Adapter<ChatAdapter.ChatViewHolder>() {
 
-    inner class ChatViewHolder(private val binding: ChatItemBinding) : RecyclerView.ViewHolder(binding.root) {
+    inner class ChatViewHolder(private val binding: ChatItemBinding) :
+        RecyclerView.ViewHolder(binding.root) {
         fun bind(user: User) {
             binding.chatName.text = user.displayName
-            val msg = lastMessages[user.userId]
-            if (msg != null) {
+            lastMessages[user.userId]?.let { msg ->
                 binding.chatMessage.text = msg.content
-                val sdf = SimpleDateFormat("hh:mm a", Locale.getDefault())
-                binding.chatTime.text = sdf.format(Date(msg.timestamp))
-            } else {
+                binding.chatTime.text =
+                    SimpleDateFormat("hh:mm a", Locale.getDefault())
+                        .format(Date(msg.timestamp))
+            } ?: run {
                 binding.chatMessage.text = ""
                 binding.chatTime.text = ""
             }
@@ -33,7 +34,9 @@ class ChatAdapter(
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ChatViewHolder {
         val binding = ChatItemBinding.inflate(
-            LayoutInflater.from(parent.context), parent, false
+            LayoutInflater.from(parent.context),
+            parent,
+            false
         )
         return ChatViewHolder(binding)
     }
@@ -44,7 +47,11 @@ class ChatAdapter(
 
     override fun getItemCount(): Int = users.size
 
-    fun updateData(newUsers: List<User>, newLastMessages: Map<String, DirectMessage?>) {
+    /** Call this whenever your user list or last‐message map changes. */
+    fun updateData(
+        newUsers: List<User>,
+        newLastMessages: Map<String, DirectMessage?>
+    ) {
         users = newUsers
         lastMessages = newLastMessages
         notifyDataSetChanged()

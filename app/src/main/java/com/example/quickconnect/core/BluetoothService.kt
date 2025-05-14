@@ -4,60 +4,77 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothServerSocket
 import android.bluetooth.BluetoothSocket
+import android.content.Context
 import android.util.Log
+import kotlinx.coroutines.cancelChildren
+import kotlinx.coroutines.isActive
 import androidx.annotation.RequiresPermission
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.serialization.PolymorphicSerializer
+import kotlinx.coroutines.launch
 import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
 import kotlinx.serialization.serializer
+import kotlinx.serialization.Serializable as KSerializable
 import java.io.BufferedReader
 import java.io.BufferedWriter
+import java.io.IOException
 import java.io.InputStreamReader
 import java.io.OutputStreamWriter
 import java.util.*
 
-@Serializable
-sealed class Packet
+private typealias SrvSocket = BluetoothServerSocket
+private typealias RfSocket  = BluetoothSocket
 
-@Serializable
-@SerialName("intro")
-data class IntroPacket(
-    val userId: String,
-    val displayName: String
-) : Packet()
+@KSerializable
+sealed class Packet {
+    @KSerializable @SerialName("intro")
+    data class IntroPacket(val userId: String, val displayName: String) : Packet()
 
-@Serializable
-@SerialName("msg")
-data class MessagePacket(
-    val senderId: String,
-    val receiverId: String,
-    val timestamp: Long,
-    val content: String
-) : Packet()
+    @KSerializable @SerialName("msg")
+    data class MessagePacket(
+        val senderId:   String,
+        val receiverId: String,
+        val timestamp:  Long,
+        val content:    String
+    ) : Packet()
+}
 
 object BluetoothService {
-    private const val TAG = "BluetoothService"
-    private val SPP_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
-    private val adapter: BluetoothAdapter? = BluetoothAdapter.getDefaultAdapter()
+    private const val TAG    = "BluetoothService"
+    private val SPP_UUID    = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
+    private val adapter     = BluetoothAdapter.getDefaultAdapter()
+    private lateinit var appContext: Context
 
-    @Volatile lateinit var localUserId: String
-    @Volatile lateinit var localDisplayName: String
+    /** Stable identity, set in init() */
+    @Volatile var localUserId:      String = ""
+    @Volatile var localDisplayName: String = ""
 
-    // JSON + polymorphic support
+    /** Must be called once in Application.onCreate() */
+    fun init(context: Context) {
+        appContext        = context.applicationContext
+        localUserId       = UserPrefs.getUserId(appContext)
+        localDisplayName  = UserPrefs.getUserName(appContext)
+        Log.d(TAG, "init: userId=$localUserId displayName=$localDisplayName")
+    }
+
     private val json = Json {
-        ignoreUnknownKeys = true
+        ignoreUnknownKeys  = true
         classDiscriminator = "type"
-        serializersModule = SerializersModule {
+        serializersModule  = SerializersModule {
             polymorphic(Packet::class) {
-                subclass(IntroPacket::class, serializer<IntroPacket>())
-                subclass(MessagePacket::class, serializer<MessagePacket>())
+                subclass(Packet.IntroPacket::class,   serializer<Packet.IntroPacket>())
+                subclass(Packet.MessagePacket::class, serializer<Packet.MessagePacket>())
             }
         }
     }
@@ -65,164 +82,137 @@ object BluetoothService {
     private val _incoming = MutableSharedFlow<Packet>(extraBufferCapacity = 50)
     val incoming: SharedFlow<Packet> = _incoming
 
-    private val ioScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val ioScope    = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val sockets    = mutableMapOf<String, RfSocket>()
+    private val writers    = mutableMapOf<String, BufferedWriter>()
+    private val userWriters= mutableMapOf<String, BufferedWriter>()
 
-    // for each device-address: socket & writer
-    private val sockets = mutableMapOf<String, BluetoothSocket>()
-    private val writers = mutableMapOf<String, BufferedWriter>()
-    // once we see intro from peer, map peer-userId→writer
-    private val userWriters = mutableMapOf<String, BufferedWriter>()
+    private var serverSocket: SrvSocket? = null
+    private var serverJob: Job?          = null
 
+    /** Start RFCOMM server (call once at app startup). */
     @SuppressLint("MissingPermission")
-    fun startDiscovery() {
-        adapter?.apply {
-            if (isDiscovering) cancelDiscovery()
-            startDiscovery()
+    fun startServer() {
+        if (serverJob != null) return
+        serverJob = ioScope.launch {
+            try {
+                serverSocket = adapter.listenUsingRfcommWithServiceRecord(
+                    "QuickConnectServer", SPP_UUID
+                )
+                Log.d(TAG, "Server socket listening…")
+                while (isActive) {
+                    val sock = serverSocket?.accept() ?: break
+                    Log.d(TAG, "Accepted connection from ${sock.remoteDevice.address}")
+                    handleSocket(sock)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Server socket error", e)
+            }
         }
     }
 
-    @RequiresPermission(Manifest.permission.BLUETOOTH_SCAN)
-    fun stopDiscovery() {
-        adapter?.cancelDiscovery()
+    /** Tear down server + all connections. */
+    fun shutdown() {
+        ioScope.launch {
+            serverJob?.cancelAndJoin()
+            runCatching { serverSocket?.close() }
+            writers.values.forEach    { runCatching { it.close() } }
+            sockets.values.forEach    { runCatching { it.close() } }
+            writers.clear(); sockets.clear(); userWriters.clear()
+            ioScope.coroutineContext.cancelChildren()
+            Log.d(TAG, "shutdown complete")
+        }
     }
 
-    /**
-     * Kick off a new RFComm connection to `device`.  You can call this
-     * multiple times (one per device).  Each socket gets its own reader loop.
-     */
+    /** Shared logic for both incoming and outgoing sockets. */
+    private fun handleSocket(sock: RfSocket) {
+        ioScope.launch {
+            val addr = sock.remoteDevice.address
+            sockets[addr] = sock
+            val w = BufferedWriter(OutputStreamWriter(sock.outputStream))
+            writers[addr] = w
+
+            // 1) Send our IntroPacket immediately
+            val introJson = json.encodeToString(
+                kotlinx.serialization.PolymorphicSerializer(Packet::class),
+                Packet.IntroPacket(localUserId, localDisplayName)
+            )
+            w.write(introJson); w.newLine(); w.flush()
+            Log.d(TAG, "→ Intro sent to $addr")
+
+            // 2) Start reading incoming lines
+            val reader = BufferedReader(InputStreamReader(sock.inputStream))
+            try {
+                reader.useLines { lines ->
+                    lines.forEach { line ->
+                        try {
+                            val pkt = json.decodeFromString<Packet>(line)
+                            if (pkt is Packet.IntroPacket) {
+                                userWriters[pkt.userId] = w
+                                Log.d(TAG, "← registered writer for ${pkt.userId}")
+                            }
+                            _incoming.emit(pkt)
+                        } catch (ser: SerializationException) {
+                            Log.e(TAG, "Malformed packet from $addr: $line", ser)
+                        }
+                    }
+                }
+            } catch (io: IOException) {
+                Log.d(TAG, "Socket closed, stopping read loop for $addr", io)
+            }
+        }
+    }
+
+    /** Outbound RFCOMM client to a peer. */
     @SuppressLint("MissingPermission")
-    fun connectTo(
-        device: BluetoothDevice,
-        localUserId: String,
-        localDisplayName: String
-    ) {
-        this.localUserId = localUserId
-        this.localDisplayName = localDisplayName
+    fun connectTo(device: BluetoothDevice, userId: String, displayName: String) {
+        localUserId      = userId
+        localDisplayName = displayName
 
         ioScope.launch {
             try {
-                adapter?.cancelDiscovery()
-
-                // 1) open socket
+                adapter.cancelDiscovery()
                 val sock = device
                     .createRfcommSocketToServiceRecord(SPP_UUID)
                     .also { it.connect() }
 
-                sockets[device.address] = sock
-
-                // 2) set up writer
-                val w = BufferedWriter(OutputStreamWriter(sock.outputStream))
-                writers[device.address] = w
-
-                // 3) send our intro
-                val introJson = json.encodeToString(
-                    PolymorphicSerializer(Packet::class),
-                    IntroPacket(localUserId, localDisplayName)
-                )
-                w.write(introJson)
-                w.write("\n")
-                w.flush()
-
-                // 4) start reader loop for this socket
-                val reader = BufferedReader(InputStreamReader(sock.inputStream))
-                ioScope.launch {
-                    reader.useLines { lines ->
-                        lines.forEach { line ->
-                            try {
-                                val pkt = json.decodeFromString<Packet>(line)
-                                // if it's their intro, register writer under their userId
-                                if (pkt is IntroPacket) {
-                                    userWriters[pkt.userId] = w
-                                }
-                                _incoming.emit(pkt)
-                            } catch (e: Exception) {
-                                Log.e(TAG, "malformed packet: $line", e)
-                            }
-                        }
-                    }
-                }
-
+                Log.d(TAG, "Outgoing connect OK to ${device.address}")
+                handleSocket(sock)
             } catch (e: Exception) {
-                Log.e(TAG, "Connection to ${device.address} failed", e)
+                Log.e(TAG, "connectTo(${device.address}) failed", e)
             }
         }
     }
 
-    /**
-     * Send any packet.  For MessagePacket, we look up the correct peer-writer by receiverId.
-     * For IntroPacket, we broadcast it to all open writers.
-     */
+    /** Broadcast an Intro or unicast a MessagePacket. */
     fun sendPacket(packet: Packet) {
         ioScope.launch {
             when (packet) {
-                is IntroPacket -> {
-                    val text = json.encodeToString(
-                        PolymorphicSerializer(Packet::class),
-                        packet
+                is Packet.IntroPacket -> {
+                    val txt = json.encodeToString(
+                        kotlinx.serialization.PolymorphicSerializer(Packet::class), packet
                     )
                     writers.values.forEach { w ->
-                        try {
-                            w.write(text); w.write("\n"); w.flush()
-                        } catch (e: Exception) {
-                            Log.e(TAG, "send intro failed", e)
-                        }
+                        runCatching {
+                            w.write(txt); w.newLine(); w.flush()
+                        }.onFailure { Log.e(TAG, "send intro failed", it) }
                     }
                 }
-
-                is MessagePacket -> {
-                    val w = userWriters[packet.receiverId]
-                    if (w != null) {
-                        try {
-                            val text = json.encodeToString(
-                                PolymorphicSerializer(Packet::class),
-                                packet
-                            )
-                            w.write(text); w.write("\n"); w.flush()
-                        } catch (e: Exception) {
-                            Log.e(TAG, "send msg failed", e)
-                        }
-                    } else {
-                        Log.w(TAG, "no connection for user ${packet.receiverId}")
-                    }
+                is Packet.MessagePacket -> {
+                    userWriters[packet.receiverId]?.let { w ->
+                        val txt = json.encodeToString(
+                            kotlinx.serialization.PolymorphicSerializer(Packet::class), packet
+                        )
+                        runCatching {
+                            w.write(txt); w.newLine(); w.flush()
+                        }.onFailure { Log.e(TAG, "send msg failed", it) }
+                    } ?: Log.w(TAG, "no connection for user ${packet.receiverId}")
                 }
-
-                else -> { /* handle other Packet subtypes */ }
             }
         }
     }
 
-    fun isConnected(address: String): Boolean {
-        return sockets[address]?.isConnected == true
-    }
-
-    // add to BluetoothService:
-    fun sendGroupMessage(content: String) {
-        val pkt = MessagePacket(
-            senderId   = localUserId,
-            receiverId = "",                // empty or “group” sentinel
-            timestamp  = System.currentTimeMillis(),
-            content    = content
-        )
-        ioScope.launch {
-            val text = json.encodeToString(PolymorphicSerializer(Packet::class), pkt)
-            writers.values.forEach { w ->
-                w.write(text); w.write("\n"); w.flush()
-            }
-        }
-    }
-
-
-    /**
-     * Tear down *all* live connections.
-     */
-    fun shutdown() {
-        ioScope.launch {
-            writers.values.forEach { runCatching { it.close() } }
-            sockets.values.forEach { runCatching { it.close() } }
-            writers.clear()
-            sockets.clear()
-            userWriters.clear()
-            ioScope.coroutineContext.cancelChildren()
-        }
-    }
+    /** Check whether we still have an open socket to that MAC address. */
+    fun isConnected(address: String): Boolean =
+        sockets[address]?.isConnected == true
 }

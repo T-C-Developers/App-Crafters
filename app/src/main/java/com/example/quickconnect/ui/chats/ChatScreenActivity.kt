@@ -1,12 +1,14 @@
 package com.example.quickconnect.ui.chats
 
 import android.os.Bundle
+import android.view.MenuItem
 import android.view.inputmethod.EditorInfo
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.quickconnect.core.BluetoothService
-import com.example.quickconnect.core.MessagePacket
+import com.example.quickconnect.core.Packet.MessagePacket
+import com.example.quickconnect.core.UserPrefs
 import com.example.quickconnect.data.AppDatabase
 import com.example.quickconnect.data.DirectMessage
 import com.example.quickconnect.databinding.ActivityChatScreenBinding
@@ -18,12 +20,20 @@ import kotlinx.coroutines.withContext
 class ChatScreenActivity : AppCompatActivity() {
     private lateinit var binding: ActivityChatScreenBinding
     private lateinit var adapter: ChatMessageAdapter
-    private val db by lazy { AppDatabase.getInstance(this) }
-    private val messageDao by lazy { db.directMessageDAO() }
 
-    private val peerId: String by lazy { intent.getStringExtra("EXTRA_USER_ID")!! }
-    private val peerName: String by lazy { intent.getStringExtra("EXTRA_DISPLAY_NAME")!! }
-    private val localUserId: String by lazy { BluetoothService.localUserId }
+    // always the same stable per-device ID
+    private val localUserId: String by lazy {
+        UserPrefs.getUserId(this)
+    }
+    private val peerId: String by lazy {
+        intent.getStringExtra("EXTRA_USER_ID")!!
+    }
+    private val peerName: String by lazy {
+        intent.getStringExtra("EXTRA_DISPLAY_NAME")!!
+    }
+
+    private val db    by lazy { AppDatabase.getInstance(this) }
+    private val msgDao by lazy { db.directMessageDAO() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -31,8 +41,10 @@ class ChatScreenActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         setSupportActionBar(binding.toolbar)
-        supportActionBar?.title = peerName
-        supportActionBar?.setDisplayHomeAsUpEnabled(true)
+        supportActionBar?.apply {
+            title = peerName
+            setDisplayHomeAsUpEnabled(true)
+        }
 
         adapter = ChatMessageAdapter(localUserId)
         binding.rvMessages.layoutManager = LinearLayoutManager(this)
@@ -46,13 +58,13 @@ class ChatScreenActivity : AppCompatActivity() {
                 .collect { pkt ->
                     if (pkt.senderId == peerId) {
                         val dm = DirectMessage(
-                            senderId = pkt.senderId,
+                            senderId   = pkt.senderId,
                             receiverId = localUserId,
-                            timestamp = pkt.timestamp,
-                            content = pkt.content,
-                            isRead = true
+                            timestamp  = pkt.timestamp,
+                            content    = pkt.content,
+                            isRead     = true
                         )
-                        withContext(Dispatchers.IO) { messageDao.insert(dm) }
+                        withContext(Dispatchers.IO) { msgDao.insert(dm) }
                         loadMessages()
                     }
                 }
@@ -61,9 +73,16 @@ class ChatScreenActivity : AppCompatActivity() {
         binding.btnSend.setOnClickListener { sendMessage() }
         binding.etMessage.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_SEND) {
-                sendMessage(); true
+                sendMessage()
+                true
             } else false
         }
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return if (item.itemId == android.R.id.home) {
+            finish(); true
+        } else super.onOptionsItemSelected(item)
     }
 
     private fun sendMessage() {
@@ -71,20 +90,20 @@ class ChatScreenActivity : AppCompatActivity() {
         if (text.isEmpty()) return
 
         val dm = DirectMessage(
-            senderId = localUserId,
+            senderId   = localUserId,
             receiverId = peerId,
-            timestamp = System.currentTimeMillis(),
-            content = text,
-            isRead = false
+            timestamp  = System.currentTimeMillis(),
+            content    = text,
+            isRead     = false
         )
         lifecycleScope.launch {
-            withContext(Dispatchers.IO) { messageDao.insert(dm) }
+            withContext(Dispatchers.IO) { msgDao.insert(dm) }
             BluetoothService.sendPacket(
                 MessagePacket(
-                    senderId = localUserId,
+                    senderId   = localUserId,
                     receiverId = peerId,
-                    timestamp = dm.timestamp,
-                    content = dm.content
+                    timestamp  = dm.timestamp,
+                    content    = dm.content
                 )
             )
             binding.etMessage.text?.clear()
@@ -94,9 +113,13 @@ class ChatScreenActivity : AppCompatActivity() {
 
     private fun loadMessages() {
         lifecycleScope.launch {
-            val msgs = withContext(Dispatchers.IO) { messageDao.getMessagesForUser(peerId) }
+            val msgs = withContext(Dispatchers.IO) {
+                msgDao.getMessagesForUser(peerId)
+            }
             adapter.updateData(msgs.sortedBy { it.timestamp })
-            binding.rvMessages.scrollToPosition(adapter.itemCount - 1)
+            if (adapter.itemCount > 0) {
+                binding.rvMessages.scrollToPosition(adapter.itemCount - 1)
+            }
         }
     }
 }

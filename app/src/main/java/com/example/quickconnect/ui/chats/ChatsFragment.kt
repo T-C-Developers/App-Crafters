@@ -8,6 +8,7 @@ import android.view.ViewGroup
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.example.quickconnect.core.BluetoothService
 import com.example.quickconnect.databinding.FragmentChatsBinding
 import com.example.quickconnect.data.AppDatabase
 import com.example.quickconnect.data.DirectMessage
@@ -23,9 +24,9 @@ class ChatsFragment : Fragment() {
     private val binding get() = _binding!!
 
     private lateinit var adapter: ChatAdapter
-    private val db by lazy { AppDatabase.getInstance(requireContext()) }
+    private val db     by lazy { AppDatabase.getInstance(requireContext()) }
     private val userDao by lazy { db.userDAO() }
-    private val messageDao by lazy { db.directMessageDAO() }
+    private val msgDao  by lazy { db.directMessageDAO() }
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -40,18 +41,18 @@ class ChatsFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         adapter = ChatAdapter(emptyList(), emptyMap()) { user ->
-            // Launch ChatScreenActivity, passing userId & displayName
             Intent(requireContext(), ChatScreenActivity::class.java).also { intent ->
                 intent.putExtra("EXTRA_USER_ID", user.userId)
                 intent.putExtra("EXTRA_DISPLAY_NAME", user.displayName)
+                intent.putExtra("EXTRA_LOCAL_USER_ID", BluetoothService.localUserId)
                 startActivity(intent)
             }
         }
+
         binding.chatList.layoutManager = LinearLayoutManager(requireContext())
         binding.chatList.adapter = adapter
 
         binding.btnConnect.setOnClickListener {
-            // Launch Bluetooth Discovery
             startActivity(Intent(requireContext(), BluetoothDiscoveryActivity::class.java))
         }
     }
@@ -63,23 +64,48 @@ class ChatsFragment : Fragment() {
 
     private fun loadChats() {
         lifecycleScope.launch {
-            // Fetch all users on IO thread
-            val users: List<User> = withContext(Dispatchers.IO) {
+            // 1) fetch actual users
+            val dbUsers = withContext(Dispatchers.IO) {
                 userDao.getAllUsers()
             }
 
-            // Build map of last messages per user
-            val lastMsgs = mutableMapOf<String, DirectMessage?>()
-            for (user in users) {
-                val msgs: List<DirectMessage> = withContext(Dispatchers.IO) {
-                    messageDao.getMessagesForUser(user.userId)
-                }
-                lastMsgs[user.userId] = msgs.firstOrNull()
+            // If no real users, show two placeholders
+            val users = if (dbUsers.isEmpty()) {
+                listOf(
+                    User(
+                        userId = "dummy1",
+                        displayName = "Alice",
+                        deviceName = "Alice’s Device",
+                        isOnline = false,
+                        lastSeen = ""
+                    ),
+                    User(
+                        userId = "dummy2",
+                        displayName = "Bob",
+                        deviceName = "Bob’s Device",
+                        isOnline = false,
+                        lastSeen = ""
+                    )
+                )
+            } else {
+                dbUsers
             }
 
-            // Update UI
+            // 2) build last‐message map
+            val lastMsgs = mutableMapOf<String, DirectMessage?>()
+            for (u in users) {
+                val msgs = if (u.userId.startsWith("dummy")) {
+                    emptyList<DirectMessage>()
+                } else {
+                    withContext(Dispatchers.IO) { msgDao.getMessagesForUser(u.userId) }
+                }
+                lastMsgs[u.userId] = msgs.firstOrNull()
+            }
+
+            // 3) update adapter & empty‐view
             adapter.updateData(users, lastMsgs)
-            binding.emptyView.visibility = if (users.isEmpty()) View.VISIBLE else View.GONE
+            // hide the “no chats” view since we now show placeholders
+            binding.emptyView.visibility = View.GONE
         }
     }
 
