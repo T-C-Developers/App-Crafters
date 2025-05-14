@@ -1,6 +1,5 @@
 package com.example.quickconnect.ui.chats
 
-import android.text.format.DateFormat
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -8,58 +7,78 @@ import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.example.quickconnect.R
-import com.example.quickconnect.model.ChatMessage
+import com.example.quickconnect.data.DirectMessage
+import java.text.SimpleDateFormat
+import java.util.*
 
-class ChatMessageAdapter(private val items: MutableList<ChatMessage>) :
-    RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+class ChatMessageAdapter(
+    private val currentUserId: String
+) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
     companion object {
-        private const val TYPE_SENT = 0
-        private const val TYPE_RECEIVED = 1
+        private const val TYPE_RECEIVED = 0
+        private const val TYPE_SENT = 1
     }
 
-    override fun getItemViewType(position: Int) =
-        if (items[position].isSentByMe) TYPE_SENT else TYPE_RECEIVED
+    private val messages = mutableListOf<DirectMessage>()
+    private val timeFormat = SimpleDateFormat("hh:mm a", Locale.getDefault())
+
+    fun updateData(newMessages: List<DirectMessage>) {
+        messages.clear()
+        messages.addAll(newMessages)
+        notifyDataSetChanged()
+    }
+
+    override fun getItemViewType(position: Int): Int {
+        return if (messages[position].senderId == currentUserId) TYPE_SENT else TYPE_RECEIVED
+    }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
-        val inflater = LayoutInflater.from(parent.context)
         return if (viewType == TYPE_SENT) {
-            SentVH(inflater.inflate(R.layout.item_message_sent, parent, false))
+            val view = LayoutInflater.from(parent.context)
+                .inflate(R.layout.item_message_sent, parent, false)
+            SentViewHolder(view)
         } else {
-            RecVH(inflater.inflate(R.layout.item_message_received, parent, false))
+            val view = LayoutInflater.from(parent.context)
+                .inflate(R.layout.item_message_received, parent, false)
+            ReceivedViewHolder(view)
         }
     }
-
-    override fun getItemCount() = items.size
 
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
-        val msg = items[position]
-        if (holder is SentVH) holder.bind(msg) else (holder as RecVH).bind(msg)
-    }
+        val msg = messages[position]
+        val timeText = timeFormat.format(Date(msg.timestamp))
 
-    fun add(msg: ChatMessage) {
-        items.add(msg)
-        notifyItemInserted(items.lastIndex)
-    }
-
-    /* ---------- ViewHolders ---------- */
-    private class SentVH(v: View) : RecyclerView.ViewHolder(v) {
-        private val tvMsg: TextView = v.findViewById(R.id.tvMsg)
-        private val tvTime: TextView = v.findViewById(R.id.tvTime)
-        private val ivTicks: ImageView = v.findViewById(R.id.ivTicks)
-        fun bind(m: ChatMessage) {
-            tvMsg.text = m.text
-            tvTime.text = DateFormat.format("hh:mm a", m.timestamp)
-            ivTicks.setImageResource(if (m.isRead) R.drawable.icon_2_ticks else R.drawable.icon_1_tick)
+        when (holder) {
+            is SentViewHolder -> holder.bind(msg, timeText)
+            is ReceivedViewHolder -> holder.bind(msg, timeText)
         }
     }
 
-    private class RecVH(v: View) : RecyclerView.ViewHolder(v) {
-        private val tvMsg: TextView = v.findViewById(R.id.tvMsg)
-        private val tvTime: TextView = v.findViewById(R.id.tvTime)
-        fun bind(m: ChatMessage) {
-            tvMsg.text = m.text
-            tvTime.text = DateFormat.format("hh:mm a", m.timestamp)
+    override fun getItemCount(): Int = messages.size
+
+    private inner class SentViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+        private val tvMsg: TextView = view.findViewById(R.id.tvMsg)
+        private val tvTime: TextView = view.findViewById(R.id.tvTime)
+        private val ivTicks: ImageView = view.findViewById(R.id.ivTicks)
+
+        fun bind(msg: DirectMessage, timeText: String) {
+            tvMsg.text = msg.content
+            tvTime.text = timeText
+            // TODO: change tick icon based on read-status
+            ivTicks.setImageResource(
+                if (msg.isRead) R.drawable.icon_2_ticks else R.drawable.icon_1_tick
+            )
+        }
+    }
+
+    private inner class ReceivedViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+        private val tvMsg: TextView = view.findViewById(R.id.tvMsg)
+        private val tvTime: TextView = view.findViewById(R.id.tvTime)
+
+        fun bind(msg: DirectMessage, timeText: String) {
+            tvMsg.text = msg.content
+            tvTime.text = timeText
         }
     }
 }

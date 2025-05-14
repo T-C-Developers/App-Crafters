@@ -1,151 +1,102 @@
 package com.example.quickconnect.ui.chats
 
-import android.bluetooth.BluetoothDevice
 import android.os.Bundle
-import android.widget.EditText
-import android.widget.ImageButton
-import android.widget.Toast
+import android.view.inputmethod.EditorInfo
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
-import com.example.quickconnect.R
 import com.example.quickconnect.core.BluetoothService
+import com.example.quickconnect.core.MessagePacket
 import com.example.quickconnect.data.AppDatabase
 import com.example.quickconnect.data.DirectMessage
-import com.example.quickconnect.model.ChatMessage
+import com.example.quickconnect.databinding.ActivityChatScreenBinding
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-class ChatScreenActivity : AppCompatActivity(), BluetoothService.Callback {
+class ChatScreenActivity : AppCompatActivity() {
+    private lateinit var binding: ActivityChatScreenBinding
+    private lateinit var adapter: ChatMessageAdapter
+    private val db by lazy { AppDatabase.getInstance(this) }
+    private val messageDao by lazy { db.directMessageDAO() }
 
-    private lateinit var messageAdapter: ChatMessageAdapter
-    private lateinit var rvMessages: RecyclerView
-    private lateinit var etMessage: EditText
-    private lateinit var bluetoothService: BluetoothService
-    private var connectedDevice: BluetoothDevice? = null
-
-    /** The id of *this* user and the peer, passed in the Intent */
-    private val currentUserId by lazy { intent.getStringExtra("currentUserId") ?: "" }      // currentUserId = me,  for now
-    private val peerId        by lazy { intent.getStringExtra("peerId") ?: "" }             // peerId = peerName, for now
-    private val peerName      by lazy { intent.getStringExtra("peerName") ?: "Unknown" }
+    private val peerId: String by lazy { intent.getStringExtra("EXTRA_USER_ID")!! }
+    private val peerName: String by lazy { intent.getStringExtra("EXTRA_DISPLAY_NAME")!! }
+    private val localUserId: String by lazy { BluetoothService.localUserId }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_chat_screen)
+        binding = ActivityChatScreenBinding.inflate(layoutInflater)
+        setContentView(binding.root)
 
-        /* Toolbar */
-        setSupportActionBar(findViewById(R.id.toolbar))
-        supportActionBar?.setDisplayHomeAsUpEnabled(true)
+        setSupportActionBar(binding.toolbar)
         supportActionBar?.title = peerName
+        supportActionBar?.setDisplayHomeAsUpEnabled(true)
 
-        /* Views */
-        rvMessages = findViewById(R.id.rvMessages)
-        etMessage  = findViewById(R.id.etMessage)
-        val btnSend: ImageButton = findViewById(R.id.btnSend)
+        adapter = ChatMessageAdapter(localUserId)
+        binding.rvMessages.layoutManager = LinearLayoutManager(this)
+        binding.rvMessages.adapter = adapter
 
-        messageAdapter = ChatMessageAdapter(mutableListOf())
-        rvMessages.layoutManager = LinearLayoutManager(this).apply { stackFromEnd = true }
-        rvMessages.adapter = messageAdapter
+        loadMessages()
 
-        bluetoothService = BluetoothService(this, this) // already connected
-
-        btnSend.setOnClickListener { sendMessage() }
-
-        loadHistory()
-    }
-
-    /** Load previous direct messages with this peer from RoomDB */
-    private fun loadHistory() {
         lifecycleScope.launch {
-            val dao = AppDatabase.getInstance(this@ChatScreenActivity).directMessageDAO()
-            val history = withContext(Dispatchers.IO) {
-                dao.getMessagesForUser(currentUserId)
-                    .filter { it.senderId == peerId || it.receiverId == peerId }
-                    .sortedBy { it.timestamp }
-            }
-            history.forEach { dm ->
-                messageAdapter.add(
-                    ChatMessage(
-                        id         = dm.id,
-                        text       = dm.content,
-                        timestamp  = dm.timestamp,
-                        isSentByMe = dm.senderId == currentUserId,
-                        isRead     = dm.isRead
-                    )
-                )
-            }
-            rvMessages.scrollToPosition(messageAdapter.itemCount - 1)
+            BluetoothService.incoming
+                .filterIsInstance<MessagePacket>()
+                .collect { pkt ->
+                    if (pkt.senderId == peerId) {
+                        val dm = DirectMessage(
+                            senderId = pkt.senderId,
+                            receiverId = localUserId,
+                            timestamp = pkt.timestamp,
+                            content = pkt.content,
+                            isRead = true
+                        )
+                        withContext(Dispatchers.IO) { messageDao.insert(dm) }
+                        loadMessages()
+                    }
+                }
+        }
+
+        binding.btnSend.setOnClickListener { sendMessage() }
+        binding.etMessage.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_SEND) {
+                sendMessage(); true
+            } else false
         }
     }
 
     private fun sendMessage() {
-        val text = etMessage.text.toString().trim()
+        val text = binding.etMessage.text.toString().trim()
         if (text.isEmpty()) return
-        val now = System.currentTimeMillis()
 
-        /* UI update */
-        messageAdapter.add(ChatMessage(text = text, timestamp = now, isSentByMe = true, isRead = false))
-        rvMessages.scrollToPosition(messageAdapter.itemCount - 1)
-        etMessage.setText("")       // clear msg typing box
-
-        /* Save locally + send */
-        lifecycleScope.launch(Dispatchers.IO) {
-            AppDatabase.getInstance(this@ChatScreenActivity)
-                .directMessageDAO()
-                .insert(
-                    DirectMessage(
-                        senderId = currentUserId,
-                        receiverId = peerId,
-                        timestamp = now,
-                        content = text,
-                        isRead = false
-                    )
+        val dm = DirectMessage(
+            senderId = localUserId,
+            receiverId = peerId,
+            timestamp = System.currentTimeMillis(),
+            content = text,
+            isRead = false
+        )
+        lifecycleScope.launch {
+            withContext(Dispatchers.IO) { messageDao.insert(dm) }
+            BluetoothService.sendPacket(
+                MessagePacket(
+                    senderId = localUserId,
+                    receiverId = peerId,
+                    timestamp = dm.timestamp,
+                    content = dm.content
                 )
+            )
+            binding.etMessage.text?.clear()
+            loadMessages()
         }
-
-        connectedDevice?.let {
-            bluetoothService.write(it, text.toByteArray())
-        } ?:
-            Toast.makeText(this, "Not connected to peer", Toast.LENGTH_SHORT).show()
     }
 
-    /* ---------- BluetoothService.Callback ---------- */
-    override fun onConnected(device: BluetoothDevice) {
-        connectedDevice = device
-    }
-
-    override fun onConnectionFailed() {
-        Toast.makeText(this, "Bluetooth connection failed", Toast.LENGTH_SHORT).show()
-    }
-
-    override fun onMessageRead(message: String) {
-        val now = System.currentTimeMillis()
-        runOnUiThread {
-            messageAdapter.add(ChatMessage(text = message, timestamp = now, isSentByMe = false))
-            rvMessages.scrollToPosition(messageAdapter.itemCount - 1)
+    private fun loadMessages() {
+        lifecycleScope.launch {
+            val msgs = withContext(Dispatchers.IO) { messageDao.getMessagesForUser(peerId) }
+            adapter.updateData(msgs.sortedBy { it.timestamp })
+            binding.rvMessages.scrollToPosition(adapter.itemCount - 1)
         }
-        lifecycleScope.launch(Dispatchers.IO) {
-            AppDatabase.getInstance(this@ChatScreenActivity)
-                .directMessageDAO()
-                .insert(
-                    DirectMessage(
-                        senderId = peerId,
-                        receiverId = currentUserId,
-                        timestamp = now,
-                        content = message,
-                        isRead = true
-                    )
-                )
-        }
-        // TODO - have to send receipts to other user
-    }
-
-    override fun onMessageWritten(message: String) {}
-
-    override fun onSupportNavigateUp(): Boolean {
-        finish()
-        return true
     }
 }

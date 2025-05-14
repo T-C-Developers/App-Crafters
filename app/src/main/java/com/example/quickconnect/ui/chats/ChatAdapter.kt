@@ -1,60 +1,52 @@
 package com.example.quickconnect.ui.chats
 
 import android.view.LayoutInflater
-import android.view.View
 import android.view.ViewGroup
-import android.widget.ImageView
-import android.widget.TextView
-import androidx.recyclerview.widget.DiffUtil
-import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
-import com.example.quickconnect.R
+import com.example.quickconnect.data.User
+import com.example.quickconnect.data.DirectMessage
+import com.example.quickconnect.databinding.ChatItemBinding
+import java.text.SimpleDateFormat
+import java.util.*
 
-data class ChatItem(val name: String, val message: String, val time: String)
+class ChatAdapter(
+    private var users: List<User>,
+    private var lastMessages: Map<String, DirectMessage?>,
+    private val onChatClick: (User) -> Unit
+) : RecyclerView.Adapter<ChatAdapter.ChatViewHolder>() {
 
-class ChatAdapter : ListAdapter<ChatItem, ChatAdapter.ChatViewHolder>(ChatDiffCallback()) {
-
-    interface OnChatClick {
-        fun onChat(item: ChatItem)
-    }
-
-    private var listener: OnChatClick? = null
-
-    fun setOnChatClick(l: (ChatItem) -> Unit) {
-        listener = object : OnChatClick {
-            override fun onChat(item: ChatItem) = l(item)
+    inner class ChatViewHolder(private val binding: ChatItemBinding) : RecyclerView.ViewHolder(binding.root) {
+        fun bind(user: User) {
+            binding.chatName.text = user.displayName
+            val msg = lastMessages[user.userId]
+            if (msg != null) {
+                binding.chatMessage.text = msg.content
+                val sdf = SimpleDateFormat("hh:mm a", Locale.getDefault())
+                binding.chatTime.text = sdf.format(Date(msg.timestamp))
+            } else {
+                binding.chatMessage.text = ""
+                binding.chatTime.text = ""
+            }
+            binding.root.setOnClickListener { onChatClick(user) }
         }
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ChatViewHolder {
-        val view = LayoutInflater.from(parent.context).inflate(R.layout.chat_item, parent, false)
-        return ChatViewHolder(view)
+        val binding = ChatItemBinding.inflate(
+            LayoutInflater.from(parent.context), parent, false
+        )
+        return ChatViewHolder(binding)
     }
 
     override fun onBindViewHolder(holder: ChatViewHolder, position: Int) {
-        val item = getItem(position)
-        holder.name.text = item.name
-        holder.message.text = item.message
-        holder.time.text = item.time
-        // [TODO] - use placeholder image
-//        holder.image.setImageResource(R.drawable.img_profile)
-        holder.itemView.setOnClickListener { listener?.onChat(item) }
+        holder.bind(users[position])
     }
 
-    class ChatViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-        val name: TextView = itemView.findViewById(R.id.chatName)
-        val message: TextView = itemView.findViewById(R.id.chatMessage)
-        val time: TextView = itemView.findViewById(R.id.chatTime)
-        val image: ImageView = itemView.findViewById(R.id.chatImage)
-    }
+    override fun getItemCount(): Int = users.size
 
-    class ChatDiffCallback : DiffUtil.ItemCallback<ChatItem>() {
-        override fun areItemsTheSame(oldItem: ChatItem, newItem: ChatItem): Boolean {
-            return oldItem.name == newItem.name // Or use unique ID if available
-        }
-
-        override fun areContentsTheSame(oldItem: ChatItem, newItem: ChatItem): Boolean {
-            return oldItem == newItem
-        }
+    fun updateData(newUsers: List<User>, newLastMessages: Map<String, DirectMessage?>) {
+        users = newUsers
+        lastMessages = newLastMessages
+        notifyDataSetChanged()
     }
 }
