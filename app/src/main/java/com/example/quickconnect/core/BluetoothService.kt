@@ -169,6 +169,7 @@ object BluetoothService {
         localUserId      = userId
         localDisplayName = displayName
 
+
         ioScope.launch {
             try {
                 adapter.cancelDiscovery()
@@ -216,3 +217,4 @@ object BluetoothService {
     fun isConnected(address: String): Boolean =
         sockets[address]?.isConnected == true
 }
+

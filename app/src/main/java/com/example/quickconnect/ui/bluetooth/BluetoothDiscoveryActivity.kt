@@ -60,6 +60,7 @@ class BluetoothDiscoveryActivity : AppCompatActivity() {
         override fun onReceive(ctx: Context, intent: Intent) {
             Log.d(TAG, "discoveryReceiver.onReceive: action=${intent.action}")
             when (intent.action) {
+
                 BluetoothDevice.ACTION_FOUND -> {
                     val device = intent.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE)
                     Log.d(TAG, "  ACTION_FOUND: ${device?.name}/${device?.address}")
@@ -126,6 +127,7 @@ class BluetoothDiscoveryActivity : AppCompatActivity() {
         supportActionBar?.apply {
             title = "Bluetooth"
             setDisplayHomeAsUpEnabled(true)
+
         }
 
         bluetoothAdapter = BluetoothAdapter.getDefaultAdapter()
@@ -189,6 +191,7 @@ class BluetoothDiscoveryActivity : AppCompatActivity() {
             initDiscovery()
         }
     }
+
 
     @SuppressLint("MissingPermission")
     private fun initDiscovery() {
@@ -264,6 +267,7 @@ class BluetoothDiscoveryActivity : AppCompatActivity() {
         }
     }
 
+    @SuppressLint("NotifyDataSetChanged")
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     private fun connectNow(device: BluetoothDevice) {
         Log.d(TAG, "connectNow → ${device.name}/${device.address}")
@@ -350,6 +354,7 @@ class BluetoothDiscoveryActivity : AppCompatActivity() {
             Toast.makeText(this, "Bluetooth permissions required", Toast.LENGTH_SHORT).show()
         }
     }
+
 
     override fun onOptionsItemSelected(item: MenuItem) =
         if (item.itemId == android.R.id.home) {
