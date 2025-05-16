@@ -27,6 +27,7 @@ class ChatsFragment : Fragment() {
     private val db     by lazy { AppDatabase.getInstance(requireContext()) }
     private val userDao by lazy { db.userDAO() }
     private val msgDao  by lazy { db.directMessageDAO() }
+    private val profileDao by lazy { db.profileDataDAO() }
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -39,6 +40,14 @@ class ChatsFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
+        lifecycleScope.launch {
+            val profile = withContext(Dispatchers.IO) {
+                profileDao.getProfileData()
+            }
+            val name = profile?.displayName ?: ""
+            binding.welcomeText.text = "Hello, $name"
+        }
 
         adapter = ChatAdapter(emptyList(), emptyMap()) { user ->
             Intent(requireContext(), ChatScreenActivity::class.java).also { intent ->

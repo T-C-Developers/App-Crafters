@@ -20,11 +20,12 @@ import com.example.quickconnect.data.ProfileData
 import com.example.quickconnect.data.ProfileDataDAO
 import com.example.quickconnect.databinding.FragmentRegisterBinding
 import kotlinx.coroutines.launch
+import com.google.android.material.imageview.ShapeableImageView
 
 class RegisterFragment : Fragment() {
     private var _binding: FragmentRegisterBinding? = null
     private lateinit var imageService: ImageService
-    private lateinit var profileImageView:ImageView
+    private lateinit var profileImageView:ShapeableImageView
     private lateinit var userId:String
     private lateinit var profileDao:ProfileDataDAO
 
@@ -46,7 +47,8 @@ class RegisterFragment : Fragment() {
         val root: View = binding.root
 
         profileImageView = binding.imageProfile
-        binding.tvSelectImage.setOnClickListener {
+
+        binding.btnAddImage.setOnClickListener {
             openFilePicker()
         }
         binding.btnSaveProfile.setOnClickListener{

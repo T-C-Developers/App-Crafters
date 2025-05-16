@@ -8,6 +8,8 @@ import androidx.annotation.RequiresPermission
 import androidx.recyclerview.widget.RecyclerView
 import com.example.quickconnect.databinding.ItemDeviceBinding
 import android.bluetooth.BluetoothDevice
+import android.graphics.Color
+import com.example.quickconnect.R
 
 /**
  * @param devices         list of devices
@@ -36,7 +38,13 @@ class DeviceAdapter(
             if (isPaired) {
                 // show “Connected” vs “Not connected”
                 b.deviceStatus.apply {
-                    text = if (isConnected(device)) "Connected" else "Not connected"
+                    if (isConnected(device)){
+                        text = context.getString(R.string.status_connected)
+                        setTextColor(Color.GREEN)
+                    } else {
+                        setTextColor(Color.RED)
+                        text = context.getString(R.string.status_not_connected)
+                    }
                     visibility = View.VISIBLE
                 }
                 b.btnUnpair.apply {

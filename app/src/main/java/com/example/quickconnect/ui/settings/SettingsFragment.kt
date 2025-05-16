@@ -2,13 +2,11 @@ package com.example.quickconnect.ui.settings
 
 import android.app.Activity
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import android.provider.MediaStore
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.ImageView
 import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
@@ -17,13 +15,15 @@ import com.example.quickconnect.data.AppDatabase
 import com.example.quickconnect.data.ProfileData
 import com.example.quickconnect.data.ProfileDataDAO
 import com.example.quickconnect.databinding.FragmentSettingsBinding
+import com.google.android.material.imageview.ShapeableImageView
 import kotlinx.coroutines.launch
+import androidx.core.net.toUri
 
 class SettingsFragment : Fragment() {
 
     private var _binding: FragmentSettingsBinding? = null
     private lateinit var imageService: ImageService
-    private lateinit var profileImageView: ImageView
+    private lateinit var profileImageView: ShapeableImageView
     private lateinit var userId: String
     private lateinit var profileDao:ProfileDataDAO
 
@@ -53,7 +53,7 @@ class SettingsFragment : Fragment() {
         // Load Profile Image when fragment opens
         loadProfileImage()
 
-        binding.changeProfilePictureButton.setOnClickListener {
+        binding.editProfileImageIcon.setOnClickListener {
             openFilePicker()
         }
         binding.saveNameButton.setOnClickListener{
@@ -161,14 +161,13 @@ class SettingsFragment : Fragment() {
                 lifecycleScope.launch {
                     val filePath = imageService.saveProfileImage(userId, imageUri)
                     if (filePath != null) {
-                        profileImageView.setImageURI(Uri.parse(filePath))
+                        profileImageView.setImageURI(filePath.toUri())
                         Toast.makeText(requireContext(), "Profile picture updated.", Toast.LENGTH_SHORT).show()
                     }
                 }
             }
         }
     }
-
 
     companion object {
         private const val IMAGE_PICKER_REQUEST_CODE = 100

@@ -18,4 +18,14 @@
     <string name="status_not_connected">Not connected</string>
     <string name="status_connecting">Connecting</string>
     <string name="device_name">Device Name</string>
+    <string name="welcome_text">Hello</string>
+    <string name="profile">Profile</string>
+    <string name="image">image</string>
+    <string name="save_name">Save Name</string>
+    <string name="discoverable">Discoverable</string>
+    <string name="notifications">Notifications</string>
+    <string name="vibration_notifications">Vibration Notifications</string>
+    <string name="privacy_settings">Privacy Settings</string>
+    <string name="continue_txt">Continue</string>
+    <string name="user_name">User Name</string>
 </resources>
