@@ -1,71 +1,70 @@
 package com.example.quickconnect.ui.bluetooth
 
 import android.Manifest
-import android.bluetooth.BluetoothDevice
-import android.content.pm.PackageManager
-import android.os.Build
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import androidx.core.content.ContextCompat
+import androidx.annotation.RequiresPermission
 import androidx.recyclerview.widget.RecyclerView
-import com.example.quickconnect.R
 import com.example.quickconnect.databinding.ItemDeviceBinding
+import android.bluetooth.BluetoothDevice
 
+/**
+ * @param devices         list of devices
+ * @param isPaired        true if this list is the "paired" section
+ * @param onDeviceClick   invoked when user taps the card
+ * @param onUnpairClick   if paired, invoked when user taps Unpair
+ * @param isConnected     for paired devices: returns true if that device is currently connected
+ */
 class DeviceAdapter(
-    private val deviceList: List<BluetoothDevice>,
-    private val listener: OnDeviceClickListener,
-    private val isConnected: (BluetoothDevice) -> Boolean
+    private val devices: List<BluetoothDevice>,
+    private val isPaired: Boolean,
+    private val onDeviceClick: (BluetoothDevice)->Unit,
+    private val onUnpairClick: ((BluetoothDevice)->Unit)? = null,
+    private val isConnected: (BluetoothDevice)->Boolean = { false }
 ) : RecyclerView.Adapter<DeviceAdapter.DeviceViewHolder>() {
 
-    interface OnDeviceClickListener {
-        fun onDeviceClick(device: BluetoothDevice)
-        fun onUnpairClick(device: BluetoothDevice)
-    }
+    inner class DeviceViewHolder(val b: ItemDeviceBinding) :
+        RecyclerView.ViewHolder(b.root) {
 
-    inner class DeviceViewHolder(private val binding: ItemDeviceBinding) : RecyclerView.ViewHolder(binding.root) {
+        @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
         fun bind(device: BluetoothDevice) {
-            val ctx = binding.root.context
+            // name & MAC
+            b.deviceName.text    = device.name ?: "Unknown Device"
+            b.deviceAddress.text = device.address
 
-            val hasConnectPerm = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                ContextCompat.checkSelfPermission(ctx, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
-            } else true // < Android 12 does not need BLUETOOTH_CONNECT
-
-            val name = if (hasConnectPerm) device.name ?: "Unnamed" else "Need permission"
-            val address = if (hasConnectPerm) device.address else "–"
-            val bonded = if (device.bondState == BluetoothDevice.BOND_BONDED) " (paired)" else ""
-
-            binding.deviceName.text = buildString {
-                append(name)
-                append(bonded)
-            }
-            binding.deviceAddress.text = address
-            binding.btnUnpair.visibility = if (device.bondState == BluetoothDevice.BOND_BONDED) View.VISIBLE else View.GONE
-
-            if (device.bondState == BluetoothDevice.BOND_NONE) {
-                // if not paired connect them.
-                binding.root.setOnClickListener { listener.onDeviceClick(device) }
+            if (isPaired) {
+                // show “Connected” vs “Not connected”
+                b.deviceStatus.apply {
+                    text = if (isConnected(device)) "Connected" else "Not connected"
+                    visibility = View.VISIBLE
+                }
+                b.btnUnpair.apply {
+                    visibility = View.VISIBLE
+                    setOnClickListener { onUnpairClick?.invoke(device) }
+                }
             } else {
-                // if paired, there should be unpair functionality.
-//                binding.root.setOnClickListener(null) // disable click for paired
-                binding.btnUnpair.setOnClickListener { listener.onUnpairClick(device) }
-                binding.deviceStatus.visibility = View.VISIBLE
-                binding.deviceStatus.text = if (isConnected(device)) "Connected" else "Not connected"
-                binding.deviceStatus.setTextColor(
-                    ContextCompat.getColor(
-                        ctx,
-                        if (isConnected(device)) R.color.green_600 else R.color.red_600
-                    )
-                )
+                b.deviceStatus.visibility = View.GONE
+                b.btnUnpair.visibility    = View.GONE
             }
+
+            b.root.setOnClickListener { onDeviceClick(device) }
         }
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): DeviceViewHolder {
-        val binding = ItemDeviceBinding.inflate(LayoutInflater.from(parent.context), parent, false)
+        val binding = ItemDeviceBinding.inflate(
+            LayoutInflater.from(parent.context),
+            parent,
+            false
+        )
         return DeviceViewHolder(binding)
     }
 
-    override fun onBindViewHolder(holder: DeviceViewHolder, position: Int) = holder.bind(deviceList[position])
-    override fun getItemCount(): Int = deviceList.size
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
+    override fun onBindViewHolder(holder: DeviceViewHolder, position: Int) {
+        holder.bind(devices[position])
+    }
+
+    override fun getItemCount(): Int = devices.size
 }
