@@ -1,22 +1,142 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
+<ScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".ui.settings.SettingsFragment">
+    android:padding="16dp"
+    android:background="@android:color/white">
 
-    <TextView
-        android:id="@+id/text_gallery"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginStart="8dp"
-        android:layout_marginTop="8dp"
-        android:layout_marginEnd="8dp"
-        android:textAlignment="center"
-        android:textSize="20sp"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
-</androidx.constraintlayout.widget.ConstraintLayout>
+        android:orientation="vertical">
+
+        <!-- Profile Section -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Profile"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp" />
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:layout_gravity="center">
+
+            <ImageView
+                android:id="@+id/profileImageView"
+                android:layout_width="120dp"
+                android:layout_height="120dp"
+                android:src="@drawable/img_profile"
+                android:scaleType="centerCrop" />
+
+            <Button
+                android:id="@+id/changeProfilePictureButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Edit Picture"
+                android:layout_marginTop="8dp" />
+        </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+        <EditText
+            android:id="@+id/userNameEditText"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:hint="Enter Your Name"
+            android:textSize="16sp"
+            android:layout_marginTop="16dp"
+            android:inputType="textPersonName"
+            android:layout_width="0dp"/>
+
+        <Button
+            android:id="@+id/saveNameButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Save Name"
+            android:layout_gravity="center"
+            android:layout_marginTop="8dp"
+            android:layout_marginLeft="10dp" />
+
+    </LinearLayout>
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="16dp"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Discoverable"
+                android:textSize="16sp"
+                android:textColor="@android:color/black" />
+
+            <Switch
+                android:id="@+id/discoverableSwitch"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+        </LinearLayout>
+
+        <!-- Notification Settings -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Notifications"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:layout_marginTop="24dp" />
+
+        <Switch
+            android:id="@+id/soundNotificationToggle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Sound Notifications" />
+
+        <Switch
+            android:id="@+id/vibrationToggle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Vibration Notifications" />
+
+        <!-- Privacy Settings -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Privacy Settings"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:layout_marginTop="24dp" />
+
+        <Switch
+            android:id="@+id/readReceiptsToggle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Read Receipts" />
+
+        <Switch
+            android:id="@+id/lastSeenToggle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Show Last Seen" />
+
+        <Button
+            android:id="@+id/clearChatHistoryButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Clear Chat History"
+            android:layout_marginTop="8dp" />
+
+    </LinearLayout>
+
+</ScrollView>
