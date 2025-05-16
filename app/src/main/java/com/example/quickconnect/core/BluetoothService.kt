@@ -1,208 +1,218 @@
 package com.example.quickconnect.core
 
 import android.Manifest
-import android.bluetooth.*
+import android.annotation.SuppressLint
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothServerSocket
+import android.bluetooth.BluetoothSocket
 import android.content.Context
-import android.content.pm.PackageManager
-import android.os.Build
-import android.os.Handler
-import android.os.Looper
 import android.util.Log
+import kotlinx.coroutines.cancelChildren
+import kotlinx.coroutines.isActive
 import androidx.annotation.RequiresPermission
-import androidx.core.app.ActivityCompat
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.launch
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.SerializationException
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.modules.SerializersModule
+import kotlinx.serialization.modules.polymorphic
+import kotlinx.serialization.serializer
+import kotlinx.serialization.Serializable as KSerializable
+import java.io.BufferedReader
+import java.io.BufferedWriter
 import java.io.IOException
-import java.io.InputStream
-import java.io.OutputStream
+import java.io.InputStreamReader
+import java.io.OutputStreamWriter
 import java.util.*
 
-private const val TAG_SERVICE = "BT_Service"
+private typealias SrvSocket = BluetoothServerSocket
+private typealias RfSocket  = BluetoothSocket
 
-/**
- * One instance per process that handles **all** Bluetooth I/O.
- * All potentially‑restricted calls are wrapped with explicit permission checks so
- * Android‑Studio lint shows _zero_ "Call requires permission" warnings.
- */
-class BluetoothService(private val context: Context, private val callback: Callback) {
+@KSerializable
+sealed class Packet {
+    @KSerializable @SerialName("intro")
+    data class IntroPacket(val userId: String, val displayName: String) : Packet()
 
-    interface Callback {
-        fun onConnected(device: BluetoothDevice)
-        fun onConnectionFailed()
-        fun onMessageRead(message: String)
-        fun onMessageWritten(message: String)
+    @KSerializable @SerialName("msg")
+    data class MessagePacket(
+        val senderId:   String,
+        val receiverId: String,
+        val timestamp:  Long,
+        val content:    String
+    ) : Packet()
+}
+
+object BluetoothService {
+    private const val TAG    = "BluetoothService"
+    private val SPP_UUID    = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
+    private val adapter     = BluetoothAdapter.getDefaultAdapter()
+    private lateinit var appContext: Context
+
+    /** Stable identity, set in init() */
+    @Volatile var localUserId:      String = ""
+    @Volatile var localDisplayName: String = ""
+
+    /** Must be called once in Application.onCreate() */
+    fun init(context: Context) {
+        appContext        = context.applicationContext
+        localUserId       = UserPrefs.getUserId(appContext)
+        localDisplayName  = UserPrefs.getUserName(appContext)
+        Log.d(TAG, "init: userId=$localUserId displayName=$localDisplayName")
     }
 
-    /* ---------------- permission helpers ---------------- */
-    private fun hasPerm(p: String) =
-        ActivityCompat.checkSelfPermission(context, p) == PackageManager.PERMISSION_GRANTED
+    private val json = Json {
+        ignoreUnknownKeys  = true
+        classDiscriminator = "type"
+        serializersModule  = SerializersModule {
+            polymorphic(Packet::class) {
+                subclass(Packet.IntroPacket::class,   serializer<Packet.IntroPacket>())
+                subclass(Packet.MessagePacket::class, serializer<Packet.MessagePacket>())
+            }
+        }
+    }
 
-    private fun hasConnectPerm() = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || hasPerm(Manifest.permission.BLUETOOTH_CONNECT)
-    private fun hasScanPerm()    = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || hasPerm(Manifest.permission.BLUETOOTH_SCAN)
+    private val _incoming = MutableSharedFlow<Packet>(extraBufferCapacity = 50)
+    val incoming: SharedFlow<Packet> = _incoming
 
-    private val adapter: BluetoothAdapter = BluetoothAdapter.getDefaultAdapter()
-    private var acceptThread: AcceptThread? = null
-    private var connectThread: ConnectThread? = null
-    private val connectedThreads = mutableMapOf<String, ConnectedThread>() // address -> thread
+    private val ioScope    = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val sockets    = mutableMapOf<String, RfSocket>()
+    private val writers    = mutableMapOf<String, BufferedWriter>()
+    private val userWriters= mutableMapOf<String, BufferedWriter>()
 
-    /* ---------------- public API ---------------- */
+    private var serverSocket: SrvSocket? = null
+    private var serverJob: Job?          = null
+
+    /** Start RFCOMM server (call once at app startup). */
+    @SuppressLint("MissingPermission")
     fun startServer() {
-        if (!hasConnectPerm()) {
-            Log.w(TAG_SERVICE, "Missing BLUETOOTH_CONNECT – cannot open server socket")
-            return
-        }
-        connectThread?.cancel()
-        if (acceptThread == null) {
-            acceptThread = AcceptThread().also { it.start() }
-        }
-    }
-
-    fun connect(device: BluetoothDevice) {
-        if (!hasConnectPerm()) {
-            Log.w(TAG_SERVICE, "Missing BLUETOOTH_CONNECT – cannot connect to remote")
-            callback.onConnectionFailed(); return
-        }
-        acceptThread?.cancel(); acceptThread = null
-        connectThread?.cancel()
-        connectThread = ConnectThread(device).also { it.start() }
-    }
-
-    fun writeBroadcast(bytes: ByteArray) {
-        connectedThreads.values.forEach { it.write(bytes) }
-    }
-
-    fun write(device: BluetoothDevice, bytes: ByteArray) {
-        connectedThreads[device.address]?.write(bytes)
-    }
-
-    fun stop() {
-        acceptThread?.cancel(); acceptThread = null
-        connectThread?.cancel(); connectThread = null
-        connectedThreads.values.forEach { it.cancel() }
-        connectedThreads.clear()
-    }
-
-    fun disconnect(device: BluetoothDevice) {
-        connectedThreads.remove(device.address)?.cancel()
-    }
-
-
-
-    /* ---------------- internal threads ---------------- */
-    private inner class AcceptThread : Thread() {
-        private var serverSocket: BluetoothServerSocket? = null
-        init {
+        if (serverJob != null) return
+        serverJob = ioScope.launch {
             try {
-                serverSocket = adapter.listenUsingRfcommWithServiceRecord(BluetoothConstants.APP_NAME, BluetoothConstants.APP_UUID)
-            } catch (e: SecurityException) {
-                Log.e(TAG_SERVICE, "listenUsingRfcomm failed – permission?", e)
+                serverSocket = adapter.listenUsingRfcommWithServiceRecord(
+                    "QuickConnectServer", SPP_UUID
+                )
+                Log.d(TAG, "Server socket listening…")
+                while (isActive) {
+                    val sock = serverSocket?.accept() ?: break
+                    Log.d(TAG, "Accepted connection from ${sock.remoteDevice.address}")
+                    handleSocket(sock)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Server socket error", e)
             }
         }
-        override fun run() {
-            serverSocket ?: return
-            while (true) {
-                try {
-                    val socket = serverSocket!!.accept()
-                    manageConnection(socket)
-                    break
-                } catch (e: IOException) {
-                    Log.e(TAG_SERVICE, "Accept failed", e); break
+    }
+
+    /** Tear down server + all connections. */
+    fun shutdown() {
+        ioScope.launch {
+            serverJob?.cancelAndJoin()
+            runCatching { serverSocket?.close() }
+            writers.values.forEach    { runCatching { it.close() } }
+            sockets.values.forEach    { runCatching { it.close() } }
+            writers.clear(); sockets.clear(); userWriters.clear()
+            ioScope.coroutineContext.cancelChildren()
+            Log.d(TAG, "shutdown complete")
+        }
+    }
+
+    /** Shared logic for both incoming and outgoing sockets. */
+    private fun handleSocket(sock: RfSocket) {
+        ioScope.launch {
+            val addr = sock.remoteDevice.address
+            sockets[addr] = sock
+            val w = BufferedWriter(OutputStreamWriter(sock.outputStream))
+            writers[addr] = w
+
+            // 1) Send our IntroPacket immediately
+            val introJson = json.encodeToString(
+                kotlinx.serialization.PolymorphicSerializer(Packet::class),
+                Packet.IntroPacket(localUserId, localDisplayName)
+            )
+            w.write(introJson); w.newLine(); w.flush()
+            Log.d(TAG, "→ Intro sent to $addr")
+
+            // 2) Start reading incoming lines
+            val reader = BufferedReader(InputStreamReader(sock.inputStream))
+            try {
+                reader.useLines { lines ->
+                    lines.forEach { line ->
+                        try {
+                            val pkt = json.decodeFromString<Packet>(line)
+                            if (pkt is Packet.IntroPacket) {
+                                userWriters[pkt.userId] = w
+                                Log.d(TAG, "← registered writer for ${pkt.userId}")
+                            }
+                            _incoming.emit(pkt)
+                        } catch (ser: SerializationException) {
+                            Log.e(TAG, "Malformed packet from $addr: $line", ser)
+                        }
+                    }
+                }
+            } catch (io: IOException) {
+                Log.d(TAG, "Socket closed, stopping read loop for $addr", io)
+            }
+        }
+    }
+
+    /** Outbound RFCOMM client to a peer. */
+    @SuppressLint("MissingPermission")
+    fun connectTo(device: BluetoothDevice, userId: String, displayName: String) {
+        localUserId      = userId
+        localDisplayName = displayName
+
+        ioScope.launch {
+            try {
+                adapter.cancelDiscovery()
+                val sock = device
+                    .createRfcommSocketToServiceRecord(SPP_UUID)
+                    .also { it.connect() }
+
+                Log.d(TAG, "Outgoing connect OK to ${device.address}")
+                handleSocket(sock)
+            } catch (e: Exception) {
+                Log.e(TAG, "connectTo(${device.address}) failed", e)
+            }
+        }
+    }
+
+    /** Broadcast an Intro or unicast a MessagePacket. */
+    fun sendPacket(packet: Packet) {
+        ioScope.launch {
+            when (packet) {
+                is Packet.IntroPacket -> {
+                    val txt = json.encodeToString(
+                        kotlinx.serialization.PolymorphicSerializer(Packet::class), packet
+                    )
+                    writers.values.forEach { w ->
+                        runCatching {
+                            w.write(txt); w.newLine(); w.flush()
+                        }.onFailure { Log.e(TAG, "send intro failed", it) }
+                    }
+                }
+                is Packet.MessagePacket -> {
+                    userWriters[packet.receiverId]?.let { w ->
+                        val txt = json.encodeToString(
+                            kotlinx.serialization.PolymorphicSerializer(Packet::class), packet
+                        )
+                        runCatching {
+                            w.write(txt); w.newLine(); w.flush()
+                        }.onFailure { Log.e(TAG, "send msg failed", it) }
+                    } ?: Log.w(TAG, "no connection for user ${packet.receiverId}")
                 }
             }
         }
-        fun cancel() { try { serverSocket?.close() } catch (_: IOException) {} }
     }
 
-    private inner class ConnectThread(private val device: BluetoothDevice) : Thread() {
-        private var socket: BluetoothSocket? = null
-        init {
-            try {
-                socket = device.createRfcommSocketToServiceRecord(BluetoothConstants.APP_UUID)
-            } catch (e: SecurityException) {
-                Log.e(TAG_SERVICE, "createRfcommSocket requires BLUETOOTH_CONNECT", e)
-            }
-        }
-        @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
-        override fun run() {
-            if (socket == null) { callback.onConnectionFailed(); return }
-            if (hasScanPerm() && adapter.isDiscovering) adapter.cancelDiscovery()
-            try {
-                socket!!.connect()
-                manageConnection(socket!!)
-            } catch (e: IOException) {
-                Log.e(TAG_SERVICE, "Connection failed", e)
-                callback.onConnectionFailed()
-                try { socket!!.close() } catch (_: IOException) {}
-            }
-        }
-        fun cancel() { try { socket?.close() } catch (_: IOException) {} }
-    }
-
-    // handle multiple Bluetooth devices
-    private fun manageConnection(socket: BluetoothSocket) {
-        val address = socket.remoteDevice.address
-
-        connectedThreads[address]?.cancel()
-        val thread = ConnectedThread(socket)
-        connectedThreads[address] = thread
-        thread.start()
-
-        callback.onConnected(socket.remoteDevice)
-    }
-
-    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
-    fun isConnectedTo(context: Context, device: BluetoothDevice): Boolean {
-        if (connectedThreads.containsKey(device.address)) return true
-
-        val manager = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
-        val connectedDevices = mutableListOf<BluetoothDevice>()
-
-        try {
-            connectedDevices += manager.getConnectedDevices(BluetoothProfile.GATT)
-        } catch (e: IllegalArgumentException) {
-            e.printStackTrace()
-        }
-
-        try {
-            connectedDevices += manager.getConnectedDevices(BluetoothProfile.HEADSET)
-        } catch (e: IllegalArgumentException) {
-            e.printStackTrace()
-        }
-
-        try {
-            connectedDevices += manager.getConnectedDevices(BluetoothProfile.A2DP)
-        } catch (e: IllegalArgumentException) {
-            e.printStackTrace()
-        }
-
-        return connectedDevices.any { it.address == device.address }
-    }
-
-    private inner class ConnectedThread(private val socket: BluetoothSocket) : Thread() {
-        private val inStream: InputStream = socket.inputStream
-        private val outStream: OutputStream = socket.outputStream
-        private val handler = Handler(Looper.getMainLooper())
-
-        override fun run() {
-            val buffer = ByteArray(1024)
-            while (true) {
-                try {
-                    val bytes = inStream.read(buffer)
-                    val msg = String(buffer, 0, bytes)
-                    handler.post { callback.onMessageRead(msg) }
-                } catch (e: IOException) {
-                    Log.e(TAG_SERVICE, "Disconnected", e)
-                    break
-                }
-            }
-        }
-
-        fun write(bytes: ByteArray) {
-            try {
-                outStream.write(bytes)
-                handler.post { callback.onMessageWritten(String(bytes)) }
-            } catch (e: IOException) {
-                Log.e(TAG_SERVICE, "Write error", e)
-            }
-        }
-        fun cancel() { try { socket.close() } catch (_: IOException) {} }
-    }
+    /** Check whether we still have an open socket to that MAC address. */
+    fun isConnected(address: String): Boolean =
+        sockets[address]?.isConnected == true
 }

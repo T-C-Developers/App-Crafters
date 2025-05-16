@@ -8,5 +8,6 @@ data class User(
     @PrimaryKey val userId: String, // UUID or MAC address
     val displayName: String,
     val deviceName: String,
-    val isOnline: Boolean       // 
+    val isOnline: Boolean,       //
+    val lastSeen: String
 )
