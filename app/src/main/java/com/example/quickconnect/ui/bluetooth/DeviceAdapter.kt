@@ -23,6 +23,7 @@ class DeviceAdapter(
     private val isPaired: Boolean,
     private val onDeviceClick: (BluetoothDevice)->Unit,
     private val onUnpairClick: ((BluetoothDevice)->Unit)? = null,
+    private val onConnectClick: ((BluetoothDevice)->Unit)? = null,
     private val isConnected: (BluetoothDevice)->Boolean = { false }
 ) : RecyclerView.Adapter<DeviceAdapter.DeviceViewHolder>() {
 
@@ -41,9 +42,11 @@ class DeviceAdapter(
                     if (isConnected(device)){
                         text = context.getString(R.string.status_connected)
                         setTextColor(Color.GREEN)
+                        b.btnConnect.visibility = View.GONE
                     } else {
                         setTextColor(Color.RED)
                         text = context.getString(R.string.status_not_connected)
+                        b.btnConnect.visibility = View.VISIBLE
                     }
                     visibility = View.VISIBLE
                 }
@@ -51,9 +54,13 @@ class DeviceAdapter(
                     visibility = View.VISIBLE
                     setOnClickListener { onUnpairClick?.invoke(device) }
                 }
+                b.btnConnect.apply {
+                    setOnClickListener { onConnectClick?.invoke(device) }
+                }
             } else {
                 b.deviceStatus.visibility = View.GONE
                 b.btnUnpair.visibility    = View.GONE
+                b.btnConnect.visibility = View.GONE
             }
 
             b.root.setOnClickListener { onDeviceClick(device) }

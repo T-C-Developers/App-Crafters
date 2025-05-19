@@ -8,6 +8,7 @@
     <string name="status_offline">Offline</string>
     <string name="message">Message</string>
     <string name="icon">icon</string>
+    <string name="connect">Connect</string>
     <string name="unpair">Unpair</string>
     <string name="paired_devices">Paired devices</string>
     <string name="available_devices">Available devices</string>

@@ -150,6 +150,7 @@ class BluetoothDiscoveryActivity : AppCompatActivity() {
             isPaired      = true,
             onDeviceClick = ::connectToDevice,
             onUnpairClick = ::unpairDevice,
+            onConnectClick = ::connectNow,
             isConnected   = { dev -> BluetoothService.isConnected(dev.address).also {
                 Log.d(TAG, "  isConnected(${dev.address}) → $it")
             } }
@@ -238,6 +239,8 @@ class BluetoothDiscoveryActivity : AppCompatActivity() {
                         userDao.insertUser(u)
                         Log.d(TAG, "    inserted user ${u.displayName}")
                     }
+                    Toast.makeText(this@BluetoothDiscoveryActivity, "user created", Toast.LENGTH_SHORT).show()
+
                 }
         }
     }
@@ -272,16 +275,16 @@ class BluetoothDiscoveryActivity : AppCompatActivity() {
     private fun connectNow(device: BluetoothDevice) {
         Log.d(TAG, "connectNow → ${device.name}/${device.address}")
         // insert immediately so your Chats screen will pick it up
-        val placeholder = User(
-            userId      = device.address,
-            displayName = device.name ?: device.address,
-            deviceName  = device.name ?: device.address,
-            isOnline    = true,
-            lastSeen    = System.currentTimeMillis().toString()
-        )
-        lifecycleScope.launch(Dispatchers.IO) {
-            userDao.insertUser(placeholder)
-        }
+//        val placeholder = User(
+//            userId      = device.address,
+//            displayName = device.name ?: device.address,
+//            deviceName  = device.name ?: device.address,
+//            isOnline    = true,
+//            lastSeen    = System.currentTimeMillis().toString()
+//        )
+//        lifecycleScope.launch(Dispatchers.IO) {
+//            userDao.insertUser(placeholder)
+//        }
         // now do the RFCOMM connect
         BluetoothService.connectTo(device, myUserId, myUserName)
     }
