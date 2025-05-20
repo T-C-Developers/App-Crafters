@@ -12,7 +12,7 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 class ChatMessageAdapter(
-    private val currentUserId: String
+    private val peerId: String
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
     companion object {
@@ -30,7 +30,7 @@ class ChatMessageAdapter(
     }
 
     override fun getItemViewType(position: Int): Int {
-        return if (messages[position].senderId == currentUserId) TYPE_SENT else TYPE_RECEIVED
+        return if (messages[position].senderId == peerId) TYPE_RECEIVED else TYPE_SENT
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {

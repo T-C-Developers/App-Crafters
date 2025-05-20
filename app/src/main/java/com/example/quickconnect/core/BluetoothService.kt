@@ -7,6 +7,7 @@ import android.bluetooth.BluetoothServerSocket
 import android.bluetooth.BluetoothSocket
 import android.content.Context
 import android.util.Log
+import com.example.quickconnect.data.AppDatabase
 import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.CoroutineScope
@@ -37,7 +38,7 @@ private typealias RfSocket  = BluetoothSocket
 @KSerializable
 sealed class Packet {
     @KSerializable @SerialName("intro")
-    data class IntroPacket(val userId: String, val displayName: String) : Packet()
+    data class IntroPacket( val displayName: String) : Packet()
 
     @KSerializable @SerialName("msg")
     data class MessagePacket(
@@ -54,17 +55,17 @@ object BluetoothService {
     private val adapter     = BluetoothAdapter.getDefaultAdapter()
     private lateinit var appContext: Context
     lateinit var macAddress :String   //most recent mac adderss
+    lateinit var appDatabase: AppDatabase
 
     /** Stable identity, set in init() */
-    @Volatile var localUserId:      String = ""
     @Volatile var localDisplayName: String = ""
 
     /** Must be called once in Application.onCreate() */
     fun init(context: Context) {
         appContext        = context.applicationContext
-        localUserId       = UserPrefs.getUserId(appContext)
-        localDisplayName  = UserPrefs.getUserName(appContext)
-        Log.d(TAG, "init: userId=$localUserId displayName=$localDisplayName")
+        appDatabase = AppDatabase.getInstance(context)
+        saveOrGetPersonaData()
+        Log.d(TAG, "init: userId= MyPhone displayName=$localDisplayName")
     }
 
     private val json = Json {
@@ -134,7 +135,7 @@ object BluetoothService {
             // 1) Send our IntroPacket immediately
             val introJson = json.encodeToString(
                 kotlinx.serialization.PolymorphicSerializer(Packet::class),
-                Packet.IntroPacket(localUserId, localDisplayName)
+                Packet.IntroPacket( localDisplayName)
             )
             runCatching {
                 w.write(introJson); w.newLine(); w.flush()
@@ -155,7 +156,7 @@ object BluetoothService {
                             if (pkt is Packet.IntroPacket) {
                                 userWriters[addr] = w
                                 macAddress = addr
-                                Log.d(TAG, "← registered writer for ${pkt.userId}")
+                                Log.d(TAG, "← registered writer for ${pkt.displayName}")
                             }
                             _incoming.emit(pkt)
                         } catch (ser: SerializationException) {
@@ -172,8 +173,7 @@ object BluetoothService {
 
     /** Outbound RFCOMM client to a peer. */
     @SuppressLint("MissingPermission")
-    fun connectTo(device: BluetoothDevice, userId: String, displayName: String) {
-        localUserId      = userId
+    fun connectTo(device: BluetoothDevice, displayName: String) {
         localDisplayName = displayName
 
 
@@ -197,7 +197,7 @@ object BluetoothService {
         val device = adapter.getRemoteDevice(macAddress)
         if (device.bondState == BluetoothDevice.BOND_BONDED) {
             Log.d(TAG, "Device already bonded → connect directly")
-            connectTo(device, localUserId, localDisplayName)
+            connectTo(device, localDisplayName)
         }
         else {
             Log.d(TAG, "Device not bonded → initiating bond")
@@ -212,7 +212,7 @@ object BluetoothService {
                                 BluetoothDevice.BOND_BONDED -> {
                                     Log.d(TAG, "Bond successful → connecting")
                                     runCatching { appContext.unregisterReceiver(this) }
-                                    connectTo(bondedDevice, localUserId, localDisplayName)
+                                    connectTo(bondedDevice, localDisplayName)
 
                                 }
                                 BluetoothDevice.BOND_NONE -> {
@@ -296,15 +296,15 @@ object BluetoothService {
 //        sockets.entries.removeIf { it.value.outputStream == writer }
     }
 
-//    private fun saveOrGetPersonaData(){
-//
-//        ioScope.launch {
-//            val profile = appDatabase.profileDataDAO().getProfileData()
-//            if (profile != null) {
-//                localDisplayName = profile.displayName
-//            }
-//        }
-//    }
+    private fun saveOrGetPersonaData(){
+
+        ioScope.launch {
+            val profile = appDatabase.profileDataDAO().getProfileData()
+            if (profile != null) {
+                localDisplayName = profile.displayName
+            }
+        }
+    }
 
     /** Check whether we still have an open socket to that MAC address. */
     fun isConnected(address: String): Boolean =

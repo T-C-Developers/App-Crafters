@@ -23,7 +23,6 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.quickconnect.core.BluetoothService
 import com.example.quickconnect.core.Packet.IntroPacket
-import com.example.quickconnect.core.UserPrefs
 import com.example.quickconnect.data.AppDatabase
 import com.example.quickconnect.data.User
 import com.example.quickconnect.databinding.ActivityBluetoothDiscoveryBinding
@@ -52,8 +51,7 @@ class BluetoothDiscoveryActivity : AppCompatActivity() {
     private val userDao by lazy { db.userDAO() }
 
     // persistent per‐device
-    private val myUserId   by lazy { UserPrefs.getUserId(this) }
-    private val myUserName by lazy { UserPrefs.getUserName(this) }
+    lateinit var myUserName :String
 
     private var isDiscoveryRegistered = false
     private var isBondReceiverRegistered = false
@@ -135,6 +133,16 @@ class BluetoothDiscoveryActivity : AppCompatActivity() {
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     override fun onCreate(saved: Bundle?) {
         super.onCreate(saved)
+        lifecycleScope.launch {
+            val profile = withContext(Dispatchers.IO) {
+                db.profileDataDAO().getProfileData()
+            }
+
+            if (profile != null) {
+                myUserName = profile.displayName
+                Log.d(TAG, "Loaded myUserName = $myUserName")
+            }
+        }
         Log.d(TAG, "onCreate")
         binding = ActivityBluetoothDiscoveryBinding.inflate(layoutInflater)
         setContentView(binding.root)
@@ -302,19 +310,7 @@ class BluetoothDiscoveryActivity : AppCompatActivity() {
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     private fun connectNow(device: BluetoothDevice) {
         Log.d(TAG, "connectNow → ${device.name}/${device.address}")
-        // insert immediately so your Chats screen will pick it up
-//        val placeholder = User(
-//            userId      = device.address,
-//            displayName = device.name ?: device.address,
-//            deviceName  = device.name ?: device.address,
-//            isOnline    = true,
-//            lastSeen    = System.currentTimeMillis().toString()
-//        )
-//        lifecycleScope.launch(Dispatchers.IO) {
-//            userDao.insertUser(placeholder)
-//        }
-        // now do the RFCOMM connect
-        BluetoothService.connectTo(device, myUserId, myUserName)
+        BluetoothService.connectTo(device,  myUserName)
     }
 
 

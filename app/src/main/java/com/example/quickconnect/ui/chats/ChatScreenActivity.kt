@@ -11,7 +11,6 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.quickconnect.core.BluetoothService
 import com.example.quickconnect.core.Packet.MessagePacket
-import com.example.quickconnect.core.UserPrefs
 import com.example.quickconnect.data.AppDatabase
 import com.example.quickconnect.data.DirectMessage
 import com.example.quickconnect.databinding.ActivityChatScreenBinding
@@ -25,11 +24,9 @@ class ChatScreenActivity : AppCompatActivity() {
     private lateinit var adapter: ChatMessageAdapter
 
     // always the same stable per-device ID
-    private val localUserId: String by lazy {
-        UserPrefs.getUserId(this)
-    }
+    private val localUserId: String = "ME"
     private val peerId: String by lazy {
-        intent.getStringExtra("EXTRA_USER_ID")!!
+        intent.getStringExtra("EXTRA_PEER_ID")!!
     }
     private val peerName: String by lazy {
         intent.getStringExtra("EXTRA_DISPLAY_NAME")!!
@@ -63,7 +60,7 @@ class ChatScreenActivity : AppCompatActivity() {
             BluetoothService.connectFromChat(peerId)
         }
 
-        adapter = ChatMessageAdapter(localUserId)
+        adapter = ChatMessageAdapter(peerId)
         binding.rvMessages.layoutManager = LinearLayoutManager(this)
         binding.rvMessages.adapter = adapter
 
