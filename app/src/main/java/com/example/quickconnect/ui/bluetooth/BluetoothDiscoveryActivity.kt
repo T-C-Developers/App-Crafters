@@ -72,7 +72,9 @@ class BluetoothDiscoveryActivity : AppCompatActivity() {
                                 n != "Unknown Device"
                     }?.also {
                         newDevices.add(it)
-                        newAdapter.notifyItemInserted(newDevices.size - 1)
+                        runOnUiThread {
+                            newAdapter.notifyItemInserted(newDevices.size - 1)
+                        }
                         Log.d(TAG, "  Added new device: ${it.name}")
                     }
                 }
@@ -239,8 +241,10 @@ class BluetoothDiscoveryActivity : AppCompatActivity() {
                         userDao.insertUser(u)
                         Log.d(TAG, "    inserted user ${u.displayName}")
                     }
-                    Toast.makeText(this@BluetoothDiscoveryActivity, "user created", Toast.LENGTH_SHORT).show()
-
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(this@BluetoothDiscoveryActivity, "Connected", Toast.LENGTH_SHORT).show()
+                        pairedAdapter.notifyDataSetChanged() // or whatever UI update you're doing
+                    }
                 }
         }
     }

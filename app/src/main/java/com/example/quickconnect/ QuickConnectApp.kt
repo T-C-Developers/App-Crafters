@@ -27,27 +27,5 @@ class QuickConnectApp : Application() {
         BluetoothService.startServer()
         Log.d(TAG, "BluetoothService.startServer()")
 
-        // 3) Persist any incoming IntroPacket into the DB
-//        val db     = AppDatabase.getInstance(this)
-//        val userDao= db.userDAO()
-//
-//        CoroutineScope(Dispatchers.IO).launch {
-//            Log.d(TAG, "Listening for IntroPackets…")
-//            BluetoothService.incoming
-//                .filterIsInstance<IntroPacket>()
-//                .collect { intro ->
-//                    Log.d(TAG, "→ Received Intro from ${intro.displayName}")
-//                    userDao.insertUser(
-//                        User(
-//                            userId      = intro.userId,
-//                            displayName = intro.displayName,
-//                            deviceName  = intro.displayName,
-//                            isOnline    = true,
-//                            lastSeen    = System.currentTimeMillis().toString()
-//                        )
-//                    )
-//                    Log.d(TAG, "✓ User saved: ${intro.displayName}")
-//                }
-//        }
     }
 }

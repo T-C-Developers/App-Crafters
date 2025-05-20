@@ -10,7 +10,26 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="#F2F2F2"
-        android:minHeight="?attr/actionBarSize" />
+        android:minHeight="?attr/actionBarSize">
+
+        <!-- Connect Button -->
+        <Button
+            android:id="@+id/btn_connect"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Connect"
+            android:layout_gravity="end" />
+
+        <!-- Connect Button -->
+        <TextView
+            android:id="@+id/connected"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Connected"
+            android:textColor="@color/green_600"
+            android:layout_gravity="end" />
+
+    </androidx.appcompat.widget.Toolbar>
 
     <!-- Messages -->
     <androidx.recyclerview.widget.RecyclerView

@@ -1,8 +1,11 @@
 package com.example.quickconnect.ui.chats
 
+import android.Manifest
 import android.os.Bundle
 import android.view.MenuItem
+import android.view.View
 import android.view.inputmethod.EditorInfo
+import androidx.annotation.RequiresPermission
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -35,6 +38,7 @@ class ChatScreenActivity : AppCompatActivity() {
     private val db    by lazy { AppDatabase.getInstance(this) }
     private val msgDao by lazy { db.directMessageDAO() }
 
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityChatScreenBinding.inflate(layoutInflater)
@@ -44,6 +48,20 @@ class ChatScreenActivity : AppCompatActivity() {
         supportActionBar?.apply {
             title = peerName
             setDisplayHomeAsUpEnabled(true)
+        }
+
+        val isConnected = BluetoothService.isConnected("48:BC:E1:47:A5:5B")
+//        val isConnected = BluetoothService.isConnected("B4:CD:27:DF:22:19")
+        if (isConnected){
+            binding.connected.visibility = View.VISIBLE
+            binding.btnConnect.visibility = View.GONE
+        }
+        else{
+            binding.connected.visibility = View.GONE
+            binding.btnConnect.visibility = View.VISIBLE
+        }
+        binding.btnConnect.setOnClickListener {
+            BluetoothService.connectFromChat("48:BC:E1:47:A5:5B")
         }
 
         adapter = ChatMessageAdapter(localUserId)

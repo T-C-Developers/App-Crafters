@@ -1,6 +1,5 @@
 package com.example.quickconnect.core
 
-import android.Manifest
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
@@ -10,7 +9,6 @@ import android.content.Context
 import android.util.Log
 import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.isActive
-import androidx.annotation.RequiresPermission
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -185,6 +183,66 @@ object BluetoothService {
         }
     }
 
+    @SuppressLint("MissingPermission")
+    fun connectFromChat(macAddress: String) {
+        val device = adapter.getRemoteDevice(macAddress)
+        if (device.bondState == BluetoothDevice.BOND_BONDED) {
+            Log.d(TAG, "Device already bonded → connect directly")
+            connectTo(device, localUserId, localDisplayName)
+        }
+        else {
+            Log.d(TAG, "Device not bonded → initiating bond")
+
+            val bondReceiver = object : android.content.BroadcastReceiver() {
+                override fun onReceive(context: Context?, intent: android.content.Intent?) {
+                    val action = intent?.action
+                    if (action == BluetoothDevice.ACTION_BOND_STATE_CHANGED) {
+                        val bondedDevice = intent.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE)
+                        if (bondedDevice?.address == macAddress) {
+                            when (bondedDevice.bondState) {
+                                BluetoothDevice.BOND_BONDED -> {
+                                    Log.d(TAG, "Bond successful → connecting")
+                                    appContext.unregisterReceiver(this)
+                                    connectTo(bondedDevice, localUserId, localDisplayName)
+
+                                }
+                                BluetoothDevice.BOND_NONE -> {
+                                    Log.e(TAG, "Bond failed")
+                                    appContext.unregisterReceiver(this)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Register receiver and start bonding
+            val filter = android.content.IntentFilter(BluetoothDevice.ACTION_BOND_STATE_CHANGED)
+            appContext.registerReceiver(bondReceiver, filter)
+            device.createBond()
+        }
+    }
+
+//    @SuppressLint("MissingPermission")
+//    fun connectFromChat(macAddress:String) {
+//        val device: BluetoothDevice = adapter.getRemoteDevice(macAddress)
+//
+//
+//        ioScope.launch {
+//            try {
+//                adapter.cancelDiscovery()
+//                val sock = device
+//                    .createRfcommSocketToServiceRecord(SPP_UUID)
+//                    .also { it.connect() }
+//
+//                Log.d(TAG, "Outgoing connect OK to ${device.address}")
+//                handleSocket(sock)
+//            } catch (e: Exception) {
+//                Log.e(TAG, "connectTo(${device.address}) failed", e)
+//            }
+//        }
+//    }
+
     /** Broadcast an Intro or unicast a MessagePacket. */
     fun sendPacket(packet: Packet) {
         ioScope.launch {
@@ -212,6 +270,16 @@ object BluetoothService {
             }
         }
     }
+
+//    private fun saveOrGetPersonaData(){
+//
+//        ioScope.launch {
+//            val profile = appDatabase.profileDataDAO().getProfileData()
+//            if (profile != null) {
+//                localDisplayName = profile.displayName
+//            }
+//        }
+//    }
 
     /** Check whether we still have an open socket to that MAC address. */
     fun isConnected(address: String): Boolean =
