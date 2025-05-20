@@ -135,8 +135,14 @@ object BluetoothService {
                 kotlinx.serialization.PolymorphicSerializer(Packet::class),
                 Packet.IntroPacket(localUserId, localDisplayName)
             )
-            w.write(introJson); w.newLine(); w.flush()
-            Log.d(TAG, "→ Intro sent to $addr")
+            runCatching {
+                w.write(introJson); w.newLine(); w.flush()
+                Log.d(TAG, "→ Intro sent to $addr")
+            }.onFailure {
+                Log.e(TAG, "Intro send failed to $addr", it)
+                cleanupWriter(w)
+                return@launch
+            }
 
             // 2) Start reading incoming lines
             val reader = BufferedReader(InputStreamReader(sock.inputStream))
@@ -157,6 +163,7 @@ object BluetoothService {
                 }
             } catch (io: IOException) {
                 Log.d(TAG, "Socket closed, stopping read loop for $addr", io)
+                cleanupWriter(w)
             }
         }
     }
@@ -202,13 +209,13 @@ object BluetoothService {
                             when (bondedDevice.bondState) {
                                 BluetoothDevice.BOND_BONDED -> {
                                     Log.d(TAG, "Bond successful → connecting")
-                                    appContext.unregisterReceiver(this)
+                                    runCatching { appContext.unregisterReceiver(this) }
                                     connectTo(bondedDevice, localUserId, localDisplayName)
 
                                 }
                                 BluetoothDevice.BOND_NONE -> {
                                     Log.e(TAG, "Bond failed")
-                                    appContext.unregisterReceiver(this)
+                                    runCatching { appContext.unregisterReceiver(this) }
                                 }
                             }
                         }
@@ -254,7 +261,10 @@ object BluetoothService {
                     writers.values.forEach { w ->
                         runCatching {
                             w.write(txt); w.newLine(); w.flush()
-                        }.onFailure { Log.e(TAG, "send intro failed", it) }
+                        }.onFailure {
+                            Log.e(TAG, "send intro failed", it)
+                            cleanupWriter(w)
+                        }
                     }
                 }
                 is Packet.MessagePacket -> {
@@ -264,11 +274,24 @@ object BluetoothService {
                         )
                         runCatching {
                             w.write(txt); w.newLine(); w.flush()
-                        }.onFailure { Log.e(TAG, "send msg failed", it) }
+                        }.onFailure {
+                            Log.e(TAG, "send msg failed", it)
+                            cleanupWriter(w)
+                        }
                     } ?: Log.w(TAG, "no connection for user ${packet.receiverId}")
                 }
             }
         }
+    }
+
+    private fun cleanupWriter(writer: BufferedWriter) {
+//        try {
+//            writer.close()
+//        } catch (_: IOException) {}
+//        // Remove from all maps (safe cleanup)
+//        writers.entries.removeIf { it.value == writer }
+//        userWriters.entries.removeIf { it.value == writer }
+//        sockets.entries.removeIf { it.value.outputStream == writer }
     }
 
 //    private fun saveOrGetPersonaData(){

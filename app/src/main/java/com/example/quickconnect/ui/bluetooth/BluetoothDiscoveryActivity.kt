@@ -373,8 +373,8 @@ class BluetoothDiscoveryActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         Log.d(TAG, "onDestroy → unregister receivers & shutdown")
-        runCatching { unregisterReceiver(discoveryReceiver) }
-        runCatching { unregisterReceiver(bondReceiver) }
-        BluetoothService.shutdown()
+//        runCatching { unregisterReceiver(discoveryReceiver) }
+//        runCatching { unregisterReceiver(bondReceiver) }
+//        BluetoothService.shutdown()
     }
 }
