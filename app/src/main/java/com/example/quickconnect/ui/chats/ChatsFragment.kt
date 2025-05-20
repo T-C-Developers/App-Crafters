@@ -51,9 +51,8 @@ class ChatsFragment : Fragment() {
 
         adapter = ChatAdapter(emptyList(), emptyMap()) { user ->
             Intent(requireContext(), ChatScreenActivity::class.java).also { intent ->
-                intent.putExtra("EXTRA_USER_ID", user.userId)
+                intent.putExtra("EXTRA_PEER_ID", user.userId)
                 intent.putExtra("EXTRA_DISPLAY_NAME", user.displayName)
-                intent.putExtra("EXTRA_LOCAL_USER_ID", BluetoothService.localUserId)
                 startActivity(intent)
             }
         }

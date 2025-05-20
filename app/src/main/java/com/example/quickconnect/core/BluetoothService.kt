@@ -1,6 +1,5 @@
 package com.example.quickconnect.core
 
-import android.Manifest
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
@@ -8,9 +7,9 @@ import android.bluetooth.BluetoothServerSocket
 import android.bluetooth.BluetoothSocket
 import android.content.Context
 import android.util.Log
+import com.example.quickconnect.data.AppDatabase
 import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.isActive
-import androidx.annotation.RequiresPermission
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -39,7 +38,7 @@ private typealias RfSocket  = BluetoothSocket
 @KSerializable
 sealed class Packet {
     @KSerializable @SerialName("intro")
-    data class IntroPacket(val userId: String, val displayName: String) : Packet()
+    data class IntroPacket( val displayName: String) : Packet()
 
     @KSerializable @SerialName("msg")
     data class MessagePacket(
@@ -55,17 +54,18 @@ object BluetoothService {
     private val SPP_UUID    = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
     private val adapter     = BluetoothAdapter.getDefaultAdapter()
     private lateinit var appContext: Context
+    lateinit var macAddress :String   //most recent mac adderss
+    lateinit var appDatabase: AppDatabase
 
     /** Stable identity, set in init() */
-    @Volatile var localUserId:      String = ""
     @Volatile var localDisplayName: String = ""
 
     /** Must be called once in Application.onCreate() */
     fun init(context: Context) {
         appContext        = context.applicationContext
-        localUserId       = UserPrefs.getUserId(appContext)
-        localDisplayName  = UserPrefs.getUserName(appContext)
-        Log.d(TAG, "init: userId=$localUserId displayName=$localDisplayName")
+        appDatabase = AppDatabase.getInstance(context)
+        saveOrGetPersonaData()
+        Log.d(TAG, "init: userId= MyPhone displayName=$localDisplayName")
     }
 
     private val json = Json {
@@ -135,10 +135,16 @@ object BluetoothService {
             // 1) Send our IntroPacket immediately
             val introJson = json.encodeToString(
                 kotlinx.serialization.PolymorphicSerializer(Packet::class),
-                Packet.IntroPacket(localUserId, localDisplayName)
+                Packet.IntroPacket( localDisplayName)
             )
-            w.write(introJson); w.newLine(); w.flush()
-            Log.d(TAG, "→ Intro sent to $addr")
+            runCatching {
+                w.write(introJson); w.newLine(); w.flush()
+                Log.d(TAG, "→ Intro sent to $addr")
+            }.onFailure {
+                Log.e(TAG, "Intro send failed to $addr", it)
+                cleanupWriter(w)
+                return@launch
+            }
 
             // 2) Start reading incoming lines
             val reader = BufferedReader(InputStreamReader(sock.inputStream))
@@ -148,8 +154,9 @@ object BluetoothService {
                         try {
                             val pkt = json.decodeFromString<Packet>(line)
                             if (pkt is Packet.IntroPacket) {
-                                userWriters[pkt.userId] = w
-                                Log.d(TAG, "← registered writer for ${pkt.userId}")
+                                userWriters[addr] = w
+                                macAddress = addr
+                                Log.d(TAG, "← registered writer for ${pkt.displayName}")
                             }
                             _incoming.emit(pkt)
                         } catch (ser: SerializationException) {
@@ -159,14 +166,14 @@ object BluetoothService {
                 }
             } catch (io: IOException) {
                 Log.d(TAG, "Socket closed, stopping read loop for $addr", io)
+                cleanupWriter(w)
             }
         }
     }
 
     /** Outbound RFCOMM client to a peer. */
     @SuppressLint("MissingPermission")
-    fun connectTo(device: BluetoothDevice, userId: String, displayName: String) {
-        localUserId      = userId
+    fun connectTo(device: BluetoothDevice, displayName: String) {
         localDisplayName = displayName
 
 
@@ -185,6 +192,66 @@ object BluetoothService {
         }
     }
 
+    @SuppressLint("MissingPermission")
+    fun connectFromChat(macAddress: String) {
+        val device = adapter.getRemoteDevice(macAddress)
+        if (device.bondState == BluetoothDevice.BOND_BONDED) {
+            Log.d(TAG, "Device already bonded → connect directly")
+            connectTo(device, localDisplayName)
+        }
+        else {
+            Log.d(TAG, "Device not bonded → initiating bond")
+
+            val bondReceiver = object : android.content.BroadcastReceiver() {
+                override fun onReceive(context: Context?, intent: android.content.Intent?) {
+                    val action = intent?.action
+                    if (action == BluetoothDevice.ACTION_BOND_STATE_CHANGED) {
+                        val bondedDevice = intent.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE)
+                        if (bondedDevice?.address == macAddress) {
+                            when (bondedDevice.bondState) {
+                                BluetoothDevice.BOND_BONDED -> {
+                                    Log.d(TAG, "Bond successful → connecting")
+                                    runCatching { appContext.unregisterReceiver(this) }
+                                    connectTo(bondedDevice, localDisplayName)
+
+                                }
+                                BluetoothDevice.BOND_NONE -> {
+                                    Log.e(TAG, "Bond failed")
+                                    runCatching { appContext.unregisterReceiver(this) }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Register receiver and start bonding
+            val filter = android.content.IntentFilter(BluetoothDevice.ACTION_BOND_STATE_CHANGED)
+            appContext.registerReceiver(bondReceiver, filter)
+            device.createBond()
+        }
+    }
+
+//    @SuppressLint("MissingPermission")
+//    fun connectFromChat(macAddress:String) {
+//        val device: BluetoothDevice = adapter.getRemoteDevice(macAddress)
+//
+//
+//        ioScope.launch {
+//            try {
+//                adapter.cancelDiscovery()
+//                val sock = device
+//                    .createRfcommSocketToServiceRecord(SPP_UUID)
+//                    .also { it.connect() }
+//
+//                Log.d(TAG, "Outgoing connect OK to ${device.address}")
+//                handleSocket(sock)
+//            } catch (e: Exception) {
+//                Log.e(TAG, "connectTo(${device.address}) failed", e)
+//            }
+//        }
+//    }
+
     /** Broadcast an Intro or unicast a MessagePacket. */
     fun sendPacket(packet: Packet) {
         ioScope.launch {
@@ -196,7 +263,10 @@ object BluetoothService {
                     writers.values.forEach { w ->
                         runCatching {
                             w.write(txt); w.newLine(); w.flush()
-                        }.onFailure { Log.e(TAG, "send intro failed", it) }
+                        }.onFailure {
+                            Log.e(TAG, "send intro failed", it)
+                            cleanupWriter(w)
+                        }
                     }
                 }
                 is Packet.MessagePacket -> {
@@ -206,9 +276,32 @@ object BluetoothService {
                         )
                         runCatching {
                             w.write(txt); w.newLine(); w.flush()
-                        }.onFailure { Log.e(TAG, "send msg failed", it) }
+                        }.onFailure {
+                            Log.e(TAG, "send msg failed", it)
+                            cleanupWriter(w)
+                        }
                     } ?: Log.w(TAG, "no connection for user ${packet.receiverId}")
                 }
+            }
+        }
+    }
+
+    private fun cleanupWriter(writer: BufferedWriter) {
+//        try {
+//            writer.close()
+//        } catch (_: IOException) {}
+//        // Remove from all maps (safe cleanup)
+//        writers.entries.removeIf { it.value == writer }
+//        userWriters.entries.removeIf { it.value == writer }
+//        sockets.entries.removeIf { it.value.outputStream == writer }
+    }
+
+    private fun saveOrGetPersonaData(){
+
+        ioScope.launch {
+            val profile = appDatabase.profileDataDAO().getProfileData()
+            if (profile != null) {
+                localDisplayName = profile.displayName
             }
         }
     }

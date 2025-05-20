@@ -1,14 +1,16 @@
 package com.example.quickconnect.ui.chats
 
+import android.Manifest
 import android.os.Bundle
 import android.view.MenuItem
+import android.view.View
 import android.view.inputmethod.EditorInfo
+import androidx.annotation.RequiresPermission
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.quickconnect.core.BluetoothService
 import com.example.quickconnect.core.Packet.MessagePacket
-import com.example.quickconnect.core.UserPrefs
 import com.example.quickconnect.data.AppDatabase
 import com.example.quickconnect.data.DirectMessage
 import com.example.quickconnect.databinding.ActivityChatScreenBinding
@@ -22,11 +24,9 @@ class ChatScreenActivity : AppCompatActivity() {
     private lateinit var adapter: ChatMessageAdapter
 
     // always the same stable per-device ID
-    private val localUserId: String by lazy {
-        UserPrefs.getUserId(this)
-    }
+    private val localUserId: String = "ME"
     private val peerId: String by lazy {
-        intent.getStringExtra("EXTRA_USER_ID")!!
+        intent.getStringExtra("EXTRA_PEER_ID")!!
     }
     private val peerName: String by lazy {
         intent.getStringExtra("EXTRA_DISPLAY_NAME")!!
@@ -35,6 +35,7 @@ class ChatScreenActivity : AppCompatActivity() {
     private val db    by lazy { AppDatabase.getInstance(this) }
     private val msgDao by lazy { db.directMessageDAO() }
 
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityChatScreenBinding.inflate(layoutInflater)
@@ -46,7 +47,20 @@ class ChatScreenActivity : AppCompatActivity() {
             setDisplayHomeAsUpEnabled(true)
         }
 
-        adapter = ChatMessageAdapter(localUserId)
+        val isConnected = BluetoothService.isConnected(peerId)
+        if (isConnected){
+            binding.connected.visibility = View.VISIBLE
+            binding.btnConnect.visibility = View.GONE
+        }
+        else{
+            binding.connected.visibility = View.GONE
+            binding.btnConnect.visibility = View.VISIBLE
+        }
+        binding.btnConnect.setOnClickListener {
+            BluetoothService.connectFromChat(peerId)
+        }
+
+        adapter = ChatMessageAdapter(peerId)
         binding.rvMessages.layoutManager = LinearLayoutManager(this)
         binding.rvMessages.adapter = adapter
 
@@ -56,9 +70,9 @@ class ChatScreenActivity : AppCompatActivity() {
             BluetoothService.incoming
                 .filterIsInstance<MessagePacket>()
                 .collect { pkt ->
-                    if (pkt.senderId == peerId) {
+                    if (BluetoothService.macAddress == peerId) {
                         val dm = DirectMessage(
-                            senderId   = pkt.senderId,
+                            senderId   = peerId,
                             receiverId = localUserId,
                             timestamp  = pkt.timestamp,
                             content    = pkt.content,

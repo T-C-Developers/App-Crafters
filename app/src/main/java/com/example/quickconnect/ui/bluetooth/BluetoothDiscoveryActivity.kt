@@ -13,6 +13,7 @@ import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.view.MenuItem
+import android.view.View
 import android.widget.Toast
 import androidx.annotation.RequiresPermission
 import androidx.appcompat.app.AppCompatActivity
@@ -22,7 +23,6 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.quickconnect.core.BluetoothService
 import com.example.quickconnect.core.Packet.IntroPacket
-import com.example.quickconnect.core.UserPrefs
 import com.example.quickconnect.data.AppDatabase
 import com.example.quickconnect.data.User
 import com.example.quickconnect.databinding.ActivityBluetoothDiscoveryBinding
@@ -51,8 +51,11 @@ class BluetoothDiscoveryActivity : AppCompatActivity() {
     private val userDao by lazy { db.userDAO() }
 
     // persistent per‐device
-    private val myUserId   by lazy { UserPrefs.getUserId(this) }
-    private val myUserName by lazy { UserPrefs.getUserName(this) }
+    lateinit var myUserName :String
+
+    private var isDiscoveryRegistered = false
+    private var isBondReceiverRegistered = false
+    private var isConnecting = false
 
     // Discovery callback
     private val discoveryReceiver = object : BroadcastReceiver() {
@@ -60,7 +63,10 @@ class BluetoothDiscoveryActivity : AppCompatActivity() {
         override fun onReceive(ctx: Context, intent: Intent) {
             Log.d(TAG, "discoveryReceiver.onReceive: action=${intent.action}")
             when (intent.action) {
-
+                BluetoothAdapter.ACTION_DISCOVERY_STARTED -> {
+                    binding.progressBar.visibility = View.VISIBLE
+                    Log.d(TAG, "  ACTION_DISCOVERY_STARTED")
+                }
                 BluetoothDevice.ACTION_FOUND -> {
                     val device = intent.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE)
                     Log.d(TAG, "  ACTION_FOUND: ${device?.name}/${device?.address}")
@@ -72,7 +78,9 @@ class BluetoothDiscoveryActivity : AppCompatActivity() {
                                 n != "Unknown Device"
                     }?.also {
                         newDevices.add(it)
-                        newAdapter.notifyItemInserted(newDevices.size - 1)
+                        runOnUiThread {
+                            newAdapter.notifyItemInserted(newDevices.size - 1)
+                        }
                         Log.d(TAG, "  Added new device: ${it.name}")
                     }
                 }
@@ -96,13 +104,19 @@ class BluetoothDiscoveryActivity : AppCompatActivity() {
                     when (it.bondState) {
                         BluetoothDevice.BOND_BONDED -> {
                             Log.d(TAG, "  BOND_BONDED → connecting now")
-                            unregisterReceiver(this)
+                            if (isBondReceiverRegistered) {
+                                unregisterReceiver(this)
+                                isBondReceiverRegistered = false
+                            }
                             connectNow(it)
                         }
                         BluetoothDevice.BOND_NONE -> {
                             Log.d(TAG, "  BOND_NONE → pairing failed")
-                            unregisterReceiver(this)
-                            binding.progressBar.visibility = android.view.View.GONE
+                            if (isBondReceiverRegistered) {
+                                unregisterReceiver(this)
+                                isBondReceiverRegistered = false
+                            }
+                            binding.progressBar.visibility = View.GONE
                             Toast.makeText(
                                 this@BluetoothDiscoveryActivity,
                                 "Pairing failed",
@@ -119,6 +133,16 @@ class BluetoothDiscoveryActivity : AppCompatActivity() {
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     override fun onCreate(saved: Bundle?) {
         super.onCreate(saved)
+        lifecycleScope.launch {
+            val profile = withContext(Dispatchers.IO) {
+                db.profileDataDAO().getProfileData()
+            }
+
+            if (profile != null) {
+                myUserName = profile.displayName
+                Log.d(TAG, "Loaded myUserName = $myUserName")
+            }
+        }
         Log.d(TAG, "onCreate")
         binding = ActivityBluetoothDiscoveryBinding.inflate(layoutInflater)
         setContentView(binding.root)
@@ -150,6 +174,7 @@ class BluetoothDiscoveryActivity : AppCompatActivity() {
             isPaired      = true,
             onDeviceClick = ::connectToDevice,
             onUnpairClick = ::unpairDevice,
+            onConnectClick = ::connectNow,
             isConnected   = { dev -> BluetoothService.isConnected(dev.address).also {
                 Log.d(TAG, "  isConnected(${dev.address}) → $it")
             } }
@@ -214,10 +239,17 @@ class BluetoothDiscoveryActivity : AppCompatActivity() {
         pairedAdapter.notifyDataSetChanged()
         Log.d(TAG, "  paired: ${pairedDevices.map { it.name }}")
 
+        // register receivers
+        val filter = IntentFilter().apply {
+            addAction(BluetoothAdapter.ACTION_DISCOVERY_STARTED)
+            addAction(BluetoothDevice.ACTION_FOUND)
+            addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED)
+        }
+
         // start scanning
         Log.d(TAG, "  registering discoveryReceiver and startDiscovery")
-        registerReceiver(discoveryReceiver, IntentFilter(BluetoothDevice.ACTION_FOUND))
-        registerReceiver(discoveryReceiver, IntentFilter(BluetoothAdapter.ACTION_DISCOVERY_FINISHED))
+        registerReceiver(discoveryReceiver, filter)
+        isDiscoveryRegistered = true
         startDiscovery()
 
         // listen for IntroPackets
@@ -228,7 +260,7 @@ class BluetoothDiscoveryActivity : AppCompatActivity() {
                 .collect { pkt ->
                     Log.d(TAG, "  got IntroPacket from ${pkt.displayName}")
                     val u = User(
-                        userId      = pkt.userId,
+                        userId      = BluetoothService.macAddress,
                         displayName = pkt.displayName,
                         deviceName  = pkt.displayName,
                         isOnline    = true,
@@ -236,7 +268,13 @@ class BluetoothDiscoveryActivity : AppCompatActivity() {
                     )
                     withContext(Dispatchers.IO) {
                         userDao.insertUser(u)
-                        Log.d(TAG, "    inserted user ${u.displayName}")
+                    }
+                        if (!isConnecting) {
+                            isConnecting = true
+                            withContext(Dispatchers.Main) {
+                                Toast.makeText(this@BluetoothDiscoveryActivity, "Connected", Toast.LENGTH_SHORT).show()
+                                pairedAdapter.notifyDataSetChanged()
+                            }
                     }
                 }
         }
@@ -260,6 +298,7 @@ class BluetoothDiscoveryActivity : AppCompatActivity() {
         if (device.bondState != BluetoothDevice.BOND_BONDED) {
             Log.d(TAG, "  not bonded → creating bond")
             registerReceiver(bondReceiver, IntentFilter(BluetoothDevice.ACTION_BOND_STATE_CHANGED))
+            isBondReceiverRegistered = true
             device.createBond()
         } else {
             Log.d(TAG, "  already bonded → connectNow")
@@ -271,19 +310,7 @@ class BluetoothDiscoveryActivity : AppCompatActivity() {
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     private fun connectNow(device: BluetoothDevice) {
         Log.d(TAG, "connectNow → ${device.name}/${device.address}")
-        // insert immediately so your Chats screen will pick it up
-        val placeholder = User(
-            userId      = device.address,
-            displayName = device.name ?: device.address,
-            deviceName  = device.name ?: device.address,
-            isOnline    = true,
-            lastSeen    = System.currentTimeMillis().toString()
-        )
-        lifecycleScope.launch(Dispatchers.IO) {
-            userDao.insertUser(placeholder)
-        }
-        // now do the RFCOMM connect
-        BluetoothService.connectTo(device, myUserId, myUserName)
+        BluetoothService.connectTo(device,  myUserName)
     }
 
 
@@ -366,8 +393,16 @@ class BluetoothDiscoveryActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         Log.d(TAG, "onDestroy → unregister receivers & shutdown")
-        runCatching { unregisterReceiver(discoveryReceiver) }
-        runCatching { unregisterReceiver(bondReceiver) }
-        BluetoothService.shutdown()
+        if (isDiscoveryRegistered) {
+            runCatching { unregisterReceiver(discoveryReceiver) }
+            isDiscoveryRegistered = false
+        }
+        if (isBondReceiverRegistered) {
+            runCatching { unregisterReceiver(bondReceiver) }
+            isBondReceiverRegistered = false
+        }
+//        runCatching { unregisterReceiver(discoveryReceiver) }
+//        runCatching { unregisterReceiver(bondReceiver) }
+//        BluetoothService.shutdown()
     }
 }
