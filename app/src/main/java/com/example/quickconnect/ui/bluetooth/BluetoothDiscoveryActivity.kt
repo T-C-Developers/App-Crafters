@@ -13,6 +13,7 @@ import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.view.MenuItem
+import android.view.View
 import android.widget.Toast
 import androidx.annotation.RequiresPermission
 import androidx.appcompat.app.AppCompatActivity
@@ -54,13 +55,20 @@ class BluetoothDiscoveryActivity : AppCompatActivity() {
     private val myUserId   by lazy { UserPrefs.getUserId(this) }
     private val myUserName by lazy { UserPrefs.getUserName(this) }
 
+    private var isDiscoveryRegistered = false
+    private var isBondReceiverRegistered = false
+    private var isConnecting = false
+
     // Discovery callback
     private val discoveryReceiver = object : BroadcastReceiver() {
         @SuppressLint("MissingPermission")
         override fun onReceive(ctx: Context, intent: Intent) {
             Log.d(TAG, "discoveryReceiver.onReceive: action=${intent.action}")
             when (intent.action) {
-
+                BluetoothAdapter.ACTION_DISCOVERY_STARTED -> {
+                    binding.progressBar.visibility = View.VISIBLE
+                    Log.d(TAG, "  ACTION_DISCOVERY_STARTED")
+                }
                 BluetoothDevice.ACTION_FOUND -> {
                     val device = intent.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE)
                     Log.d(TAG, "  ACTION_FOUND: ${device?.name}/${device?.address}")
@@ -98,13 +106,19 @@ class BluetoothDiscoveryActivity : AppCompatActivity() {
                     when (it.bondState) {
                         BluetoothDevice.BOND_BONDED -> {
                             Log.d(TAG, "  BOND_BONDED → connecting now")
-                            unregisterReceiver(this)
+                            if (isBondReceiverRegistered) {
+                                unregisterReceiver(this)
+                                isBondReceiverRegistered = false
+                            }
                             connectNow(it)
                         }
                         BluetoothDevice.BOND_NONE -> {
                             Log.d(TAG, "  BOND_NONE → pairing failed")
-                            unregisterReceiver(this)
-                            binding.progressBar.visibility = android.view.View.GONE
+                            if (isBondReceiverRegistered) {
+                                unregisterReceiver(this)
+                                isBondReceiverRegistered = false
+                            }
+                            binding.progressBar.visibility = View.GONE
                             Toast.makeText(
                                 this@BluetoothDiscoveryActivity,
                                 "Pairing failed",
@@ -217,10 +231,17 @@ class BluetoothDiscoveryActivity : AppCompatActivity() {
         pairedAdapter.notifyDataSetChanged()
         Log.d(TAG, "  paired: ${pairedDevices.map { it.name }}")
 
+        // register receivers
+        val filter = IntentFilter().apply {
+            addAction(BluetoothAdapter.ACTION_DISCOVERY_STARTED)
+            addAction(BluetoothDevice.ACTION_FOUND)
+            addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED)
+        }
+
         // start scanning
         Log.d(TAG, "  registering discoveryReceiver and startDiscovery")
-        registerReceiver(discoveryReceiver, IntentFilter(BluetoothDevice.ACTION_FOUND))
-        registerReceiver(discoveryReceiver, IntentFilter(BluetoothAdapter.ACTION_DISCOVERY_FINISHED))
+        registerReceiver(discoveryReceiver, filter)
+        isDiscoveryRegistered = true
         startDiscovery()
 
         // listen for IntroPackets
@@ -231,7 +252,7 @@ class BluetoothDiscoveryActivity : AppCompatActivity() {
                 .collect { pkt ->
                     Log.d(TAG, "  got IntroPacket from ${pkt.displayName}")
                     val u = User(
-                        userId      = pkt.userId,
+                        userId      = BluetoothService.macAddress,
                         displayName = pkt.displayName,
                         deviceName  = pkt.displayName,
                         isOnline    = true,
@@ -239,11 +260,13 @@ class BluetoothDiscoveryActivity : AppCompatActivity() {
                     )
                     withContext(Dispatchers.IO) {
                         userDao.insertUser(u)
-                        Log.d(TAG, "    inserted user ${u.displayName}")
                     }
-                    withContext(Dispatchers.Main) {
-                        Toast.makeText(this@BluetoothDiscoveryActivity, "Connected", Toast.LENGTH_SHORT).show()
-                        pairedAdapter.notifyDataSetChanged() // or whatever UI update you're doing
+                        if (!isConnecting) {
+                            isConnecting = true
+                            withContext(Dispatchers.Main) {
+                                Toast.makeText(this@BluetoothDiscoveryActivity, "Connected", Toast.LENGTH_SHORT).show()
+                                pairedAdapter.notifyDataSetChanged()
+                            }
                     }
                 }
         }
@@ -267,6 +290,7 @@ class BluetoothDiscoveryActivity : AppCompatActivity() {
         if (device.bondState != BluetoothDevice.BOND_BONDED) {
             Log.d(TAG, "  not bonded → creating bond")
             registerReceiver(bondReceiver, IntentFilter(BluetoothDevice.ACTION_BOND_STATE_CHANGED))
+            isBondReceiverRegistered = true
             device.createBond()
         } else {
             Log.d(TAG, "  already bonded → connectNow")
@@ -373,6 +397,14 @@ class BluetoothDiscoveryActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         Log.d(TAG, "onDestroy → unregister receivers & shutdown")
+        if (isDiscoveryRegistered) {
+            runCatching { unregisterReceiver(discoveryReceiver) }
+            isDiscoveryRegistered = false
+        }
+        if (isBondReceiverRegistered) {
+            runCatching { unregisterReceiver(bondReceiver) }
+            isBondReceiverRegistered = false
+        }
 //        runCatching { unregisterReceiver(discoveryReceiver) }
 //        runCatching { unregisterReceiver(bondReceiver) }
 //        BluetoothService.shutdown()

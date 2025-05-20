@@ -50,8 +50,7 @@ class ChatScreenActivity : AppCompatActivity() {
             setDisplayHomeAsUpEnabled(true)
         }
 
-        val isConnected = BluetoothService.isConnected("48:BC:E1:47:A5:5B")
-//        val isConnected = BluetoothService.isConnected("B4:CD:27:DF:22:19")
+        val isConnected = BluetoothService.isConnected(peerId)
         if (isConnected){
             binding.connected.visibility = View.VISIBLE
             binding.btnConnect.visibility = View.GONE
@@ -61,7 +60,7 @@ class ChatScreenActivity : AppCompatActivity() {
             binding.btnConnect.visibility = View.VISIBLE
         }
         binding.btnConnect.setOnClickListener {
-            BluetoothService.connectFromChat("48:BC:E1:47:A5:5B")
+            BluetoothService.connectFromChat(peerId)
         }
 
         adapter = ChatMessageAdapter(localUserId)
@@ -74,9 +73,9 @@ class ChatScreenActivity : AppCompatActivity() {
             BluetoothService.incoming
                 .filterIsInstance<MessagePacket>()
                 .collect { pkt ->
-                    if (pkt.senderId == peerId) {
+                    if (BluetoothService.macAddress == peerId) {
                         val dm = DirectMessage(
-                            senderId   = pkt.senderId,
+                            senderId   = peerId,
                             receiverId = localUserId,
                             timestamp  = pkt.timestamp,
                             content    = pkt.content,

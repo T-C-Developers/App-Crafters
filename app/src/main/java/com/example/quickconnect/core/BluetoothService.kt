@@ -53,6 +53,7 @@ object BluetoothService {
     private val SPP_UUID    = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
     private val adapter     = BluetoothAdapter.getDefaultAdapter()
     private lateinit var appContext: Context
+    lateinit var macAddress :String   //most recent mac adderss
 
     /** Stable identity, set in init() */
     @Volatile var localUserId:      String = ""
@@ -152,7 +153,8 @@ object BluetoothService {
                         try {
                             val pkt = json.decodeFromString<Packet>(line)
                             if (pkt is Packet.IntroPacket) {
-                                userWriters[pkt.userId] = w
+                                userWriters[addr] = w
+                                macAddress = addr
                                 Log.d(TAG, "← registered writer for ${pkt.userId}")
                             }
                             _incoming.emit(pkt)
