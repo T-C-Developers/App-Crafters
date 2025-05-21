@@ -23,10 +23,10 @@ class ChatsFragment : Fragment() {
     private val binding get() = _binding!!
 
     private lateinit var adapter: ChatAdapter
-    private val db     by lazy { AppDatabase.getInstance(requireContext()) }
-    private val userDao by lazy { db.userDAO() }
-    private val msgDao  by lazy { db.directMessageDAO() }
-    private val profileDao by lazy { db.profileDataDAO() }
+    private val db          by lazy { AppDatabase.getInstance(requireContext()) }
+    private val userDao     by lazy { db.userDAO() }
+    private val msgDao      by lazy { db.directMessageDAO() }
+    private val profileDao  by lazy { db.profileDataDAO() }
 
     // Full data lists for filtering
     private var allUsers: List<User> = emptyList()
@@ -49,8 +49,7 @@ class ChatsFragment : Fragment() {
             val profile = withContext(Dispatchers.IO) {
                 profileDao.getProfileData()
             }
-            val name = profile?.displayName ?: ""
-            binding.welcomeText.text = "Hello, $name"
+            binding.welcomeText.text = "Hello, ${profile?.displayName.orEmpty()}"
         }
 
         // RecyclerView + adapter
@@ -88,46 +87,24 @@ class ChatsFragment : Fragment() {
     private fun loadChats() {
         lifecycleScope.launch {
             // 1) fetch actual users
-            val dbUsers = withContext(Dispatchers.IO) {
+            val allUsers = withContext(Dispatchers.IO) {
                 userDao.getAllUsers()
-            }
-
-            // If no real users, show two placeholders
-            val users = if (dbUsers.isEmpty()) {
-                listOf(
-                    User(
-                        userId = "dummy1",
-                        displayName = "Alice",
-                        deviceName = "Alice’s Device",
-                        isOnline = false,
-                        lastSeen = ""
-                    ),
-                    User(
-                        userId = "dummy2",
-                        displayName = "Bob",
-                        deviceName = "Bob’s Device",
-                        isOnline = false,
-                        lastSeen = ""
-                    )
-                )
-            } else {
-                dbUsers
             }
 
             // 2) build last‐message map
             val lastMsgs = mutableMapOf<String, DirectMessage?>()
-            for (u in users) {
-                val msgs = if (u.userId.startsWith("dummy")) emptyList() else
-                    withContext(Dispatchers.IO) { msgDao.getMessagesForUser(u.userId) }
+            allUsers.forEach { u ->
+                val msgs = withContext(Dispatchers.IO) {
+                    msgDao.getMessagesForUser(u.userId) // suspend fun returning List<DirectMessage>
+                }
                 lastMsgs[u.userId] = msgs.firstOrNull()
             }
 
             // Cache full data
-            allUsers = users
             allLastMessages = lastMsgs
 
             // Initial display (apply any active search)
-            filterChats(binding.etSearch.text.toString())
+            filterChats(binding.etSearch.text.toString().trim())
         }
     }
 
