@@ -1,6 +1,5 @@
 package com.example.quickconnect.ui.blogs
 
-import android.net.Uri
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -10,6 +9,7 @@ import com.example.quickconnect.databinding.ItemBroadcastBinding
 import com.example.quickconnect.data.BroadcastMessage
 import java.text.DateFormat
 import java.util.*
+import androidx.core.net.toUri
 
 class BroadcastsAdapter(
     private var items: List<BroadcastMessage>
@@ -38,7 +38,7 @@ class BroadcastsAdapter(
             if (!msg.fileUri.isNullOrEmpty()) {
                 b.ivMedia.visibility = View.VISIBLE
                 Glide.with(b.ivMedia.context)
-                    .load(Uri.parse(msg.fileUri))
+                    .load(msg.fileUri.toUri())
                     .into(b.ivMedia)
             } else {
                 b.ivMedia.visibility = View.GONE

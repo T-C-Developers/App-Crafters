@@ -18,6 +18,7 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.launch
+import kotlinx.serialization.PolymorphicSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
@@ -35,6 +36,7 @@ import java.util.*
 private typealias SrvSocket = BluetoothServerSocket
 private typealias RfSocket  = BluetoothSocket
 
+
 @KSerializable
 sealed class Packet {
     @KSerializable @SerialName("intro")
@@ -46,6 +48,14 @@ sealed class Packet {
         val receiverId: String,
         val timestamp:  Long,
         val content:    String
+    ) : Packet()
+
+    @KSerializable @SerialName("broadcast")
+    data class BroadcastPacket(
+        val senderName: String,
+        val timestamp: Long,
+        val content: String?,
+        val fileUri: String?
     ) : Packet()
 }
 
@@ -75,6 +85,7 @@ object BluetoothService {
             polymorphic(Packet::class) {
                 subclass(Packet.IntroPacket::class,   serializer<Packet.IntroPacket>())
                 subclass(Packet.MessagePacket::class, serializer<Packet.MessagePacket>())
+                subclass(Packet.BroadcastPacket::class,  serializer<Packet.BroadcastPacket>())
             }
         }
     }
@@ -235,11 +246,12 @@ object BluetoothService {
     /** Broadcast an Intro or unicast a MessagePacket. */
     fun sendPacket(packet: Packet) {
         ioScope.launch {
+            val txt = json.encodeToString(
+                PolymorphicSerializer(Packet::class), packet
+            )
             when (packet) {
-                is Packet.IntroPacket -> {
-                    val txt = json.encodeToString(
-                        kotlinx.serialization.PolymorphicSerializer(Packet::class), packet
-                    )
+                is Packet.IntroPacket,
+                is Packet.BroadcastPacket -> {
                     writers.values.forEach { w ->
                         runCatching {
                             w.write(txt); w.newLine(); w.flush()
@@ -251,9 +263,6 @@ object BluetoothService {
                 }
                 is Packet.MessagePacket -> {
                     userWriters[packet.receiverId]?.let { w ->
-                        val txt = json.encodeToString(
-                            kotlinx.serialization.PolymorphicSerializer(Packet::class), packet
-                        )
                         runCatching {
                             w.write(txt); w.newLine(); w.flush()
                         }.onFailure {

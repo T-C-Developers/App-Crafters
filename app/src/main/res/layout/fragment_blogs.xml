@@ -21,5 +21,6 @@
         app:srcCompat="@drawable/icon_plus"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
+        android:backgroundTint="@color/blue_500"
         android:layout_margin="16dp" />
 </androidx.constraintlayout.widget.ConstraintLayout>

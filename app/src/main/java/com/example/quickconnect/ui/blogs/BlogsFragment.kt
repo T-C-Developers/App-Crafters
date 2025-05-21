@@ -1,4 +1,3 @@
-
 package com.example.quickconnect.ui.blogs
 
 import android.os.Bundle
@@ -34,7 +33,7 @@ class BlogsFragment : Fragment() {
             adapter = this@BlogsFragment.adapter
         }
 
-        // Observe broadcasts
+        // Get broadcast messages from DB
         AppDatabase.getInstance(requireContext())
             .broadcastMessageDAO()
             .getAll()

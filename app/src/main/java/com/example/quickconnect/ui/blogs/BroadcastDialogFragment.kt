@@ -71,11 +71,11 @@ class BroadcastDialogFragment : DialogFragment() {
 
             // Broadcast via Bluetooth
             BluetoothService.sendPacket(
-                Packet.MessagePacket(
-                    senderId   = BluetoothService.localDisplayName,
-                    receiverId = "", // broadcast
-                    timestamp  = timestamp,
-                    content    = text ?: ""
+                Packet.BroadcastPacket(
+                    senderName  = BluetoothService.localDisplayName,
+                    timestamp = timestamp,
+                    content   = text,
+                    fileUri   = uriStr
                 )
             )
 
