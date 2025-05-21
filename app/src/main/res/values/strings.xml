@@ -29,4 +29,7 @@
     <string name="privacy_settings">Privacy Settings</string>
     <string name="continue_txt">Continue</string>
     <string name="user_name">User Name</string>
+    <string name="select_photo_file">Select Photo/File</string>
+    <string name="cancel">Cancel</string>
+    <string name="send">Send</string>
 </resources>

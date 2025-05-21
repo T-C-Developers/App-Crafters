@@ -232,26 +232,6 @@ object BluetoothService {
         }
     }
 
-//    @SuppressLint("MissingPermission")
-//    fun connectFromChat(macAddress:String) {
-//        val device: BluetoothDevice = adapter.getRemoteDevice(macAddress)
-//
-//
-//        ioScope.launch {
-//            try {
-//                adapter.cancelDiscovery()
-//                val sock = device
-//                    .createRfcommSocketToServiceRecord(SPP_UUID)
-//                    .also { it.connect() }
-//
-//                Log.d(TAG, "Outgoing connect OK to ${device.address}")
-//                handleSocket(sock)
-//            } catch (e: Exception) {
-//                Log.e(TAG, "connectTo(${device.address}) failed", e)
-//            }
-//        }
-//    }
-
     /** Broadcast an Intro or unicast a MessagePacket. */
     fun sendPacket(packet: Packet) {
         ioScope.launch {
