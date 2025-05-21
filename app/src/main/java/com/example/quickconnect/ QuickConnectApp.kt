@@ -49,6 +49,7 @@ class QuickConnectApp : Application() {
                         // 2) insert into DB so your UI will pick it up
                         val newId = dao.insert(
                             BroadcastMessage(
+                                senderName = pkt.senderName,
                                 content = pkt.content,
                                 fileUri = fileUri,
                                 timestamp = pkt.timestamp

@@ -22,7 +22,6 @@ import com.example.quickconnect.core.CleanupBroadcastWorker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.io.File
-import java.util.Date
 import java.util.concurrent.TimeUnit
 
 class BroadcastDialogFragment : DialogFragment() {
@@ -72,6 +71,7 @@ class BroadcastDialogFragment : DialogFragment() {
                 val id = AppDatabase.getInstance(requireContext())
                     .broadcastMessageDAO()
                     .insert(BroadcastMessage(
+                        senderName = BluetoothService.localDisplayName,
                         content = text,
                         fileUri = localCacheUri,    // <-- store the real path here
                         timestamp = ts
@@ -99,7 +99,6 @@ class BroadcastDialogFragment : DialogFragment() {
 
             dialog.dismiss()
         }
-
 
         return dialog
     }

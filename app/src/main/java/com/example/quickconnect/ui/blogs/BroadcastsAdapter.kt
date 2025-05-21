@@ -35,6 +35,9 @@ class BroadcastsAdapter(
     class ViewHolder(private val b: ItemBroadcastBinding) : RecyclerView.ViewHolder(b.root) {
         fun bind(msg: BroadcastMessage) {
             b.tvContent.text = msg.content ?: ""
+            b.tvSender.text = msg.senderName
+            b.tvContent.text = msg.content.orEmpty()
+
             if (!msg.fileUri.isNullOrEmpty()) {
                 b.ivMedia.visibility = View.VISIBLE
                 Glide.with(b.ivMedia.context)

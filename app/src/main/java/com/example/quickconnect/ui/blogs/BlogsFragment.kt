@@ -4,6 +4,7 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.quickconnect.data.AppDatabase
@@ -25,6 +26,10 @@ class BlogsFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
+        // Tell the host Activity to use this toolbar
+        (requireActivity() as AppCompatActivity)
+            .setSupportActionBar(binding.toolbar)
 
         // Setup RecyclerView
         adapter = BroadcastsAdapter(emptyList())
