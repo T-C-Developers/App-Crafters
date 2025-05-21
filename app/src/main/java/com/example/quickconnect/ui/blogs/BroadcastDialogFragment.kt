@@ -21,6 +21,7 @@ import androidx.work.workDataOf
 import com.example.quickconnect.core.CleanupBroadcastWorker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import java.io.File
 import java.util.Date
 import java.util.concurrent.TimeUnit
 
@@ -51,17 +52,32 @@ class BroadcastDialogFragment : DialogFragment() {
         binding.btnClose.setOnClickListener {
             dialog.dismiss()
         }
-        binding.btnSend.setOnClickListener {
-            val text = binding.etMessage.text.toString().takeIf(String::isNotBlank)
-            val uriStr = selectedUri?.toString()
-            val timestamp = Date().time
 
-            // Insert into DB and schedule deletion
+        binding.btnSend.setOnClickListener {
+            val text   = binding.etMessage.text.toString().takeIf(String::isNotBlank)
+            val uri    = selectedUri
+            val ts     = System.currentTimeMillis()
+
+            // 1) If you want to keep a stable local copy (so you can show it even after the
+            //    original content:// URI might go away), read & write it into cache:
+            val localCacheUri: String? = uri?.let {
+                val bytes = requireContext().contentResolver.openInputStream(it)!!.use { it.readBytes() }
+                val f = File(requireContext().cacheDir, "broadcast_$ts.jpg")
+                f.outputStream().use { it.write(bytes) }
+                Uri.fromFile(f).toString()
+            }
+
+            // 2) save into Room *with* that cache-file URI
             lifecycleScope.launch(Dispatchers.IO) {
                 val id = AppDatabase.getInstance(requireContext())
                     .broadcastMessageDAO()
-                    .insert(BroadcastMessage(content = text, fileUri = uriStr, timestamp = timestamp))
+                    .insert(BroadcastMessage(
+                        content = text,
+                        fileUri = localCacheUri,    // <-- store the real path here
+                        timestamp = ts
+                    ))
 
+                // schedule cleanup exactly as before…
                 val work = OneTimeWorkRequestBuilder<CleanupBroadcastWorker>()
                     .setInitialDelay(1, TimeUnit.HOURS)
                     .setInputData(workDataOf("id" to id))
@@ -69,18 +85,21 @@ class BroadcastDialogFragment : DialogFragment() {
                 WorkManager.getInstance(requireContext()).enqueue(work)
             }
 
-            // Broadcast via Bluetooth
-            BluetoothService.sendPacket(
-                Packet.BroadcastPacket(
-                    senderName  = BluetoothService.localDisplayName,
-                    timestamp = timestamp,
-                    content   = text,
-                    fileUri   = uriStr
-                )
-            )
+            // 3) send packet (we still Base64-serialize for the wire)
+            val base64 = uri?.let {
+                requireContext().contentResolver.openInputStream(it)!!.use { it.readBytes() }
+                    .let { android.util.Base64.encodeToString(it, android.util.Base64.NO_WRAP) }
+            }
+            BluetoothService.sendPacket(Packet.BroadcastPacket(
+                senderName    = BluetoothService.localDisplayName,
+                timestamp   = ts,
+                content     = text,
+                imageBase64 = base64
+            ))
 
             dialog.dismiss()
         }
+
 
         return dialog
     }

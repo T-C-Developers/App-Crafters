@@ -55,7 +55,7 @@ sealed class Packet {
         val senderName: String,
         val timestamp: Long,
         val content: String?,
-        val fileUri: String?
+        val imageBase64: String?
     ) : Packet()
 }
 
