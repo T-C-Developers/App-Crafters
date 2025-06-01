@@ -1,5 +1,6 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical">
@@ -10,14 +11,16 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="#F2F2F2"
-        android:minHeight="?attr/actionBarSize">
+        android:minHeight="?attr/actionBarSize"
+        android:paddingRight="10dp"
+        tools:ignore="RtlHardcoded,RtlSymmetry">
 
         <!-- Connect Button -->
         <Button
             android:id="@+id/btn_connect"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Connect"
+            android:text="@string/reconnect"
             android:layout_gravity="end" />
 
         <!-- Connect Button -->
@@ -25,7 +28,7 @@
             android:id="@+id/connected"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Connected"
+            android:text="@string/status_connected"
             android:textColor="@color/green_600"
             android:layout_gravity="end" />
 

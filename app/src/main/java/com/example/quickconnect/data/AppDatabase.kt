@@ -12,7 +12,8 @@ import androidx.room.RoomDatabase
         User::class,
         Group::class,
         GroupMember::class,
-        ProfileData::class
+        ProfileData::class,
+        BroadcastMessage::class
     ],
     version = 1
 )
@@ -22,6 +23,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun groupDAO(): GroupDAO
     abstract fun userDAO(): UserDAO
     abstract fun profileDataDAO(): ProfileDataDAO
+    abstract fun broadcastMessageDAO(): BroadcastMessageDAO
 
     companion object {
         @Volatile private var INSTANCE: AppDatabase? = null

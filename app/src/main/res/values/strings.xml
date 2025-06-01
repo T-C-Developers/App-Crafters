@@ -9,6 +9,7 @@
     <string name="message">Message</string>
     <string name="icon">icon</string>
     <string name="connect">Connect</string>
+    <string name="reconnect">Reconnect</string>
     <string name="unpair">Unpair</string>
     <string name="paired_devices">Paired devices</string>
     <string name="available_devices">Available devices</string>
@@ -29,4 +30,8 @@
     <string name="privacy_settings">Privacy Settings</string>
     <string name="continue_txt">Continue</string>
     <string name="user_name">User Name</string>
+    <string name="select_photo_file">Select Photo/File</string>
+    <string name="cancel">Cancel</string>
+    <string name="send">Send</string>
+    <string name="sender_name">Sender Name</string>
 </resources>
