@@ -76,12 +76,19 @@ class QuickConnectApp : Application() {
                 .filterIsInstance<Packet.MessagePacket>()
                 .collect { pkt ->
                     val dao = AppDatabase.getInstance(applicationContext).directMessageDAO()
+                    val NewImageUri: String? = pkt.imageBase64?.let { b64 ->
+                        val bytes = android.util.Base64.decode(b64, android.util.Base64.NO_WRAP)
+                        val f = File(applicationContext.cacheDir, "sentImage_${pkt.timestamp}.jpg")
+                        f.outputStream().use { it.write(bytes) }
+                        Uri.fromFile(f).toString()
+                    }
                     dao.insert(
                         DirectMessage(
                             senderId   = BluetoothService.macAddress,
                             receiverId = BluetoothService.localDisplayName,
                             timestamp  = pkt.timestamp,
                             content    = pkt.content,
+                            fileUri    = NewImageUri,
                             isRead     = false
                         )
                     )

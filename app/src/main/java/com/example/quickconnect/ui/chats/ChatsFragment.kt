@@ -87,7 +87,7 @@ class ChatsFragment : Fragment() {
     private fun loadChats() {
         lifecycleScope.launch {
             // 1) fetch actual users
-            val allUsers = withContext(Dispatchers.IO) {
+            allUsers = withContext(Dispatchers.IO) {
                 userDao.getAllUsers()
             }
 
