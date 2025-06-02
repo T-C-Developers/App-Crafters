@@ -19,6 +19,7 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import com.example.quickconnect.R
+import com.example.quickconnect.core.BluetoothService
 import com.example.quickconnect.core.ImageService
 import com.example.quickconnect.data.AppDatabase
 import com.example.quickconnect.data.ProfileData
@@ -82,6 +83,7 @@ class RegisterFragment : Fragment() {
             val profileImagePath = "ProfilePictures/$userId.jpg"
             val profileData = ProfileData(userId=userId, displayName =newName,profileImagePath=profileImagePath)
             profileDao.insertOrUpdateProfileData(profileData)
+            BluetoothService.saveOrGetPersonaData()
             findNavController().navigate(R.id.nav_chats)
         }
     }

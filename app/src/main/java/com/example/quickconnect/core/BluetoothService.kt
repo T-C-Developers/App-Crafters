@@ -286,7 +286,7 @@ object BluetoothService {
 //        sockets.entries.removeIf { it.value.outputStream == writer }
     }
 
-    private fun saveOrGetPersonaData(){
+    fun saveOrGetPersonaData(){
 
         ioScope.launch {
             val profile = appDatabase.profileDataDAO().getProfileData()
