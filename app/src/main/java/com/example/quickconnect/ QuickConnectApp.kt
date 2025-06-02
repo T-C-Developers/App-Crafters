@@ -105,31 +105,30 @@ class QuickConnectApp : Application() {
                     var senderName = AppDatabase.getInstance(applicationContext).userDAO().getUserById(BluetoothService.macAddress)?.displayName
                     if(senderName.isNullOrBlank()) {senderName =""}
 
-//                    val profileData = AppDatabase.getInstance(applicationContext).profileDataDAO().getProfileData()
-//                    var soundsOn = profileData?.soundNotification
-//                    var vibrationOn = profileData?.vibrationNotification
-//                    println("notificaition"+profileData)
-//
-//                    if(soundsOn == null) {
-//                        soundsOn = true
-//                    }
-//                    if(vibrationOn == null) {
-//                        vibrationOn = true
-//                    }
+                    val profileData = AppDatabase.getInstance(applicationContext).profileDataDAO().getProfileData()
+                    var soundsOn = profileData?.soundNotification
+                    var vibrationOn = profileData?.vibrationNotification
+
+                    if(soundsOn == null) {
+                        soundsOn = false
+                    }
+                    if(vibrationOn == null) {
+                        vibrationOn = false
+                    }
 
                     withContext(Dispatchers.Main) {
-                        pkt.content?.let { sendNewMessageNotification(applicationContext, pkt.content,senderName) }
+                        pkt.content?.let { sendNewMessageNotification(applicationContext, pkt.content,senderName,soundsOn,vibrationOn) }
                     }
                 }
         }
     }
 
     @SuppressLint("MissingPermission")
-    fun sendNewMessageNotification(context: Context, messageContent: String, senderName:String) {
+    fun sendNewMessageNotification(context: Context, messageContent: String, senderName:String,soundsOn:Boolean,vibrationOn:Boolean) {
         val channelId = "messages_channel"
         val notificationId = 1
 
-        var defaultSoundUri= RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+        val defaultSoundUri: Uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
         var vibrationPattern = longArrayOf(0, 300, 200, 300)
 
         // Create Notification Channel (Android 8+)
@@ -140,32 +139,46 @@ class QuickConnectApp : Application() {
 
             val channel = NotificationChannel(channelId, name, importance).apply {
                 description = descriptionText
-                setSound(
-                    defaultSoundUri, AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_NOTIFICATION)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                        .build()
-                )
-                enableVibration(true)
+                if (soundsOn) {
+                    setSound(
+                        defaultSoundUri,
+                        AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                            .build()
+                    )
+                } else {
+                    setSound(null, null)
+                }
+                enableVibration(vibrationOn)
+                if (vibrationOn) {
+                    vibrationPattern = vibrationPattern
+                }
             }
-
             val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             notificationManager.createNotificationChannel(channel)
         }
 
-        // Build the Notification
+        // Build notification
         val builder = NotificationCompat.Builder(context, channelId)
-            .setSmallIcon(R.drawable.icon_chats)
-            .setContentTitle("New Message")
-            .setContentText(senderName+" : "+messageContent)
+            .setSmallIcon(R.drawable.icon_chats) // Replace with your own icon
+            .setContentTitle(senderName)
+            .setContentText(messageContent)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
-            .setSound(defaultSoundUri) // Optional: for pre-Android 8
-            .setVibrate(vibrationPattern) // Optional: for pre-Android 8
-            .setDefaults(NotificationCompat.DEFAULT_ALL) // Ensures lights/sound/vibration on supported versions
 
-        with(NotificationManagerCompat.from(context)) {
-            notify(notificationId, builder.build())
+        if (soundsOn) {
+            builder.setSound(defaultSoundUri)
         }
+        else{
+            builder.setSilent(true)
+        }
+
+        if (vibrationOn) {
+            builder.setVibrate(vibrationPattern)
+        }
+
+        val notificationManagerCompat = NotificationManagerCompat.from(context)
+        notificationManagerCompat.notify(notificationId, builder.build())
     }
 }
