@@ -9,7 +9,8 @@ data class DirectMessage(
     val senderId: String,
     val receiverId: String,
     val timestamp: Long,
-    val content: String,
+    val content: String?,
+    val fileUri: String?,
     val isRead: Boolean
 ) {
 }

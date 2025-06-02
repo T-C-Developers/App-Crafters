@@ -18,6 +18,7 @@ import com.example.quickconnect.databinding.FragmentSettingsBinding
 import com.google.android.material.imageview.ShapeableImageView
 import kotlinx.coroutines.launch
 import androidx.core.net.toUri
+import com.example.quickconnect.core.BluetoothService
 
 class SettingsFragment : Fragment() {
 
@@ -100,6 +101,7 @@ class SettingsFragment : Fragment() {
     private fun updateUserName(newName: String) {
         lifecycleScope.launch {
             profileDao.updateUserName(newName)
+            BluetoothService.saveOrGetPersonaData()
             Toast.makeText(requireContext(), "Name Updated Successfully", Toast.LENGTH_SHORT).show()
             loadProfileData() // Refresh UI
         }
