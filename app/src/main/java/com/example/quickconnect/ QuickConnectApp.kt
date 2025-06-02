@@ -1,5 +1,6 @@
 package com.example.quickconnect
 
+import android.annotation.SuppressLint
 import android.app.Application
 import android.net.Uri
 import androidx.work.OneTimeWorkRequestBuilder
@@ -17,6 +18,15 @@ import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.launch
 import java.io.File
 import java.util.concurrent.TimeUnit
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.content.Context
+import android.media.AudioAttributes
+import android.media.RingtoneManager
+import android.os.Build
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
+import kotlinx.coroutines.withContext
 
 class QuickConnectApp : Application() {
     companion object {
@@ -92,7 +102,70 @@ class QuickConnectApp : Application() {
                             isRead     = false
                         )
                     )
+                    var senderName = AppDatabase.getInstance(applicationContext).userDAO().getUserById(BluetoothService.macAddress)?.displayName
+                    if(senderName.isNullOrBlank()) {senderName =""}
+
+//                    val profileData = AppDatabase.getInstance(applicationContext).profileDataDAO().getProfileData()
+//                    var soundsOn = profileData?.soundNotification
+//                    var vibrationOn = profileData?.vibrationNotification
+//                    println("notificaition"+profileData)
+//
+//                    if(soundsOn == null) {
+//                        soundsOn = true
+//                    }
+//                    if(vibrationOn == null) {
+//                        vibrationOn = true
+//                    }
+
+                    withContext(Dispatchers.Main) {
+                        pkt.content?.let { sendNewMessageNotification(applicationContext, pkt.content,senderName) }
+                    }
                 }
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    fun sendNewMessageNotification(context: Context, messageContent: String, senderName:String) {
+        val channelId = "messages_channel"
+        val notificationId = 1
+
+        var defaultSoundUri= RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+        var vibrationPattern = longArrayOf(0, 300, 200, 300)
+
+        // Create Notification Channel (Android 8+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val name = "Messages"
+            val descriptionText = "Notifications for new chat messages"
+            val importance = NotificationManager.IMPORTANCE_HIGH
+
+            val channel = NotificationChannel(channelId, name, importance).apply {
+                description = descriptionText
+                setSound(
+                    defaultSoundUri, AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+                )
+                enableVibration(true)
+            }
+
+            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.createNotificationChannel(channel)
+        }
+
+        // Build the Notification
+        val builder = NotificationCompat.Builder(context, channelId)
+            .setSmallIcon(R.drawable.icon_chats)
+            .setContentTitle("New Message")
+            .setContentText(senderName+" : "+messageContent)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
+            .setSound(defaultSoundUri) // Optional: for pre-Android 8
+            .setVibrate(vibrationPattern) // Optional: for pre-Android 8
+            .setDefaults(NotificationCompat.DEFAULT_ALL) // Ensures lights/sound/vibration on supported versions
+
+        with(NotificationManagerCompat.from(context)) {
+            notify(notificationId, builder.build())
         }
     }
 }

@@ -2,7 +2,9 @@ package com.example.quickconnect.ui.settings
 
 import android.app.Activity
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
 import android.view.LayoutInflater
@@ -10,6 +12,9 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.Toast
+import androidx.annotation.RequiresPermission
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
@@ -31,6 +36,7 @@ class RegisterFragment : Fragment() {
 
     private val binding get() = _binding!!
 
+    @RequiresPermission(android.Manifest.permission.POST_NOTIFICATIONS)
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -54,6 +60,18 @@ class RegisterFragment : Fragment() {
         binding.btnSaveProfile.setOnClickListener{
             val newName = binding.etDisplayName.text.toString()
             registerUser(userId,newName)
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(requireContext(),android.Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED) {
+
+                ActivityCompat.requestPermissions(
+                    requireActivity(),
+                    arrayOf(android.Manifest.permission.POST_NOTIFICATIONS),
+                    1001
+                )
+            }
         }
 
         return root
