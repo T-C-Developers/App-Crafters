@@ -86,11 +86,29 @@ class QuickConnectApp : Application() {
                 .filterIsInstance<Packet.MessagePacket>()
                 .collect { pkt ->
                     val dao = AppDatabase.getInstance(applicationContext).directMessageDAO()
-                    val NewImageUri: String? = pkt.imageBase64?.let { b64 ->
-                        val bytes = android.util.Base64.decode(b64, android.util.Base64.NO_WRAP)
-                        val f = File(applicationContext.cacheDir, "sentImage_${pkt.timestamp}.jpg")
-                        f.outputStream().use { it.write(bytes) }
-                        Uri.fromFile(f).toString()
+                    val fileUri: String? = when {
+                        // Handle image
+                        pkt.imageBase64 != null -> {
+                            val bytes = android.util.Base64.decode(pkt.imageBase64, android.util.Base64.NO_WRAP)
+                            val file = File(applicationContext.cacheDir, "image_${pkt.timestamp}.jpg")
+                            file.outputStream().use { it.write(bytes) }
+                            Uri.fromFile(file).toString()
+                        }
+
+                        // Handle other files
+                        pkt.fileBase64 != null && pkt.fileName != null -> {
+                            val rawExt = pkt.fileName.substringAfterLast('.', "").takeIf { it.isNotBlank() }
+                            val safeExt = rawExt?.lowercase()?.takeIf {
+                                it.matches(Regex("^[a-z0-9]{1,10}$"))
+                            } ?: "pdf"
+
+                            val bytes = android.util.Base64.decode(pkt.fileBase64, android.util.Base64.NO_WRAP)
+                            val file = File(applicationContext.cacheDir, "file_${pkt.timestamp}.$safeExt")
+                            file.outputStream().use { it.write(bytes) }
+                            Uri.fromFile(file).toString()
+                        }
+
+                        else -> null
                     }
                     dao.insert(
                         DirectMessage(
@@ -98,8 +116,10 @@ class QuickConnectApp : Application() {
                             receiverId = BluetoothService.localDisplayName,
                             timestamp  = pkt.timestamp,
                             content    = pkt.content,
-                            fileUri    = NewImageUri,
-                            isRead     = false
+                            fileUri    = fileUri,
+                            fileName   = pkt.fileName,
+                            isRead     = false,
+
                         )
                     )
                     var senderName = AppDatabase.getInstance(applicationContext).userDAO().getUserById(BluetoothService.macAddress)?.displayName

@@ -47,8 +47,11 @@ sealed class Packet {
         val senderId:   String,
         val receiverId: String,
         val timestamp:  Long,
-        val content:    String?,
-        val imageBase64: String?
+        val content:    String? = null,
+        val imageBase64: String? = null,
+        val fileName: String? = null,
+        val fileBase64: String? = null,
+        val fileMimeType: String? = null
     ) : Packet()
 
     @KSerializable @SerialName("broadcast")

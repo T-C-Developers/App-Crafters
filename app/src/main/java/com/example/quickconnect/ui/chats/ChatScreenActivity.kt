@@ -1,7 +1,13 @@
 package com.example.quickconnect.ui.chats
 
 import android.Manifest
+import android.annotation.SuppressLint
+import android.app.Activity
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
+import android.provider.OpenableColumns
+import android.util.Base64
 import android.view.MenuItem
 import android.view.View
 import android.view.inputmethod.EditorInfo
@@ -29,20 +35,22 @@ class ChatScreenActivity : AppCompatActivity() {
 
     private val msgDao by lazy { AppDatabase.getInstance(this).directMessageDAO() }
 
+    companion object {
+        private const val REQUEST_CODE_PICK_FILE = 102
+    }
+
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityChatScreenBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // Toolbar
         setSupportActionBar(binding.toolbar)
         supportActionBar?.apply {
             title = peerName
             setDisplayHomeAsUpEnabled(true)
         }
 
-        // Connection indicator
         if (BluetoothService.isConnected(peerId)) {
             binding.connected.visibility = View.VISIBLE
             binding.btnConnect.visibility = View.GONE
@@ -92,7 +100,12 @@ class ChatScreenActivity : AppCompatActivity() {
         }
 
         binding.btnAttach.setOnClickListener {
-            ImageSendDialogFragment(peerId).show(supportFragmentManager, "ImageSendDialog")
+            val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
+                type = "*/*"
+                putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("application/pdf", "text/plain"))
+            }
+            startActivityForResult(intent, REQUEST_CODE_PICK_FILE)
+//            ImageSendDialogFragment(peerId).show(supportFragmentManager, "ImageSendDialog")
         }
     }
 
@@ -105,7 +118,8 @@ class ChatScreenActivity : AppCompatActivity() {
             receiverId = peerId,
             timestamp  = System.currentTimeMillis(),
             content    = text,
-            fileUri = null,
+            fileUri    = null,
+            fileName   = null,
             isRead     = false
         )
 
@@ -127,6 +141,60 @@ class ChatScreenActivity : AppCompatActivity() {
 
         // 3) clear input
         binding.etMessage.text?.clear()
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+
+        if (requestCode == REQUEST_CODE_PICK_FILE && resultCode == Activity.RESULT_OK) {
+            data?.data?.let { uri ->
+                contentResolver.openInputStream(uri)?.use { inputStream ->
+                    val fileBytes = inputStream.readBytes()
+                    val fileBase64 = Base64.encodeToString(fileBytes, Base64.DEFAULT)
+                    val fileName = getFileName(uri)
+                    val fileType = contentResolver.getType(uri) ?: "application/octet-stream"
+
+                    val timestamp = System.currentTimeMillis()
+
+                    val dm = DirectMessage(
+                        senderId = localUserId,
+                        receiverId = peerId,
+                        timestamp = timestamp,
+                        content = null,
+                        fileUri = uri.toString(),
+                        fileName = "temp",
+                        isRead = false
+                    )
+
+                    lifecycleScope.launch(Dispatchers.IO) {
+                        msgDao.insert(dm)
+                    }
+
+                    BluetoothService.sendPacket(
+                        MessagePacket(
+                            senderId = localUserId,
+                            receiverId = peerId,
+                            timestamp = timestamp,
+                            fileName = fileName,
+                            fileMimeType = fileType,
+                            fileBase64 = fileBase64
+                        )
+                    )
+                }
+            }
+        }
+    }
+
+    @SuppressLint("Range")
+    private fun getFileName(uri: Uri): String {
+        var name = "unknown"
+        val cursor = contentResolver.query(uri, null, null, null, null)
+        cursor?.use {
+            if (it.moveToFirst()) {
+                name = it.getString(it.getColumnIndex(OpenableColumns.DISPLAY_NAME))
+            }
+        }
+        return name
     }
 
     override fun onOptionsItemSelected(item: MenuItem) =

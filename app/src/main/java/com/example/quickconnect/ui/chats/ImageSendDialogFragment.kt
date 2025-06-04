@@ -18,8 +18,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.io.File
 
-class ImageSendDialogFragment(peerId: String) : DialogFragment() {
-    private var peerId :String = peerId
+class ImageSendDialogFragment(private var peerId: String) : DialogFragment() {
     private var _binding: DialogBroadcastBinding? = null
     private val binding get() = _binding!!
     private var selectedUri: Uri? = null
@@ -72,6 +71,7 @@ class ImageSendDialogFragment(peerId: String) : DialogFragment() {
                             timestamp=ts,
                             content= text.orEmpty(),
                             isRead= false,
+                            fileName = null,
                             fileUri = localCacheUri,
                     )
                     )
