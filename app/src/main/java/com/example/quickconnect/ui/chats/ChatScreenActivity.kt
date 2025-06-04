@@ -1,7 +1,13 @@
 package com.example.quickconnect.ui.chats
 
 import android.Manifest
+import android.annotation.SuppressLint
+import android.app.Activity
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
+import android.provider.OpenableColumns
+import android.util.Base64
 import android.view.MenuItem
 import android.view.View
 import android.view.inputmethod.EditorInfo
@@ -29,20 +35,22 @@ class ChatScreenActivity : AppCompatActivity() {
 
     private val msgDao by lazy { AppDatabase.getInstance(this).directMessageDAO() }
 
+    companion object {
+        private const val REQUEST_CODE_PICK_FILE = 102
+    }
+
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityChatScreenBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // Toolbar
         setSupportActionBar(binding.toolbar)
         supportActionBar?.apply {
             title = peerName
             setDisplayHomeAsUpEnabled(true)
         }
 
-        // Connection indicator
         if (BluetoothService.isConnected(peerId)) {
             binding.connected.visibility = View.VISIBLE
             binding.btnConnect.visibility = View.GONE
@@ -105,7 +113,8 @@ class ChatScreenActivity : AppCompatActivity() {
             receiverId = peerId,
             timestamp  = System.currentTimeMillis(),
             content    = text,
-            fileUri = null,
+            fileUri    = null,
+            fileName   = null,
             isRead     = false
         )
 

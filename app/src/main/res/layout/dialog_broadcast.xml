@@ -20,15 +20,29 @@
             android:layout_marginBottom="12dp"
             android:contentDescription="@string/image"/>
 
-        <!-- Attach button -->
-        <ImageButton
-            android:id="@+id/btnSelectMedia"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:src="@drawable/icon_add_photo_alternate"
-            android:background="?android:attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@string/select_photo_file"/>
+        <LinearLayout
+            android:orientation="horizontal"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
 
+            <!-- Attach button -->
+            <ImageButton
+                android:id="@+id/btnSelectMedia"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:src="@drawable/icon_add_photo_alternate"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/select_photo_file"/>
+
+            <!-- selected file -->
+            <TextView
+                android:id="@+id/selectedFileName"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:maxLines="1"/>
+
+        </LinearLayout>
         <!-- Text input -->
         <EditText
             android:id="@+id/etMessage"

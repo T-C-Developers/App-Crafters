@@ -6,10 +6,10 @@
         android:icon="@drawable/icon_chats"
         android:title="@string/title_chats" />
 
-    <item
-        android:id="@+id/nav_groups"
-        android:icon="@drawable/icon_group"
-        android:title="@string/title_groups" />
+<!--    <item-->
+<!--        android:id="@+id/nav_groups"-->
+<!--        android:icon="@drawable/icon_group"-->
+<!--        android:title="@string/title_groups" />-->
 
     <item
         android:id="@+id/nav_settings"

@@ -11,11 +11,11 @@
         android:label="@string/title_chats"
         tools:layout="@layout/fragment_chats" />
 
-    <fragment
-        android:id="@+id/nav_groups"
-        android:name="com.example.quickconnect.ui.groups.GroupsFragment"
-        android:label="@string/title_groups"
-        tools:layout="@layout/fragment_groups" />
+<!--    <fragment-->
+<!--        android:id="@+id/nav_groups"-->
+<!--        android:name="com.example.quickconnect.ui.groups.GroupsFragment"-->
+<!--        android:label="@string/title_groups"-->
+<!--        tools:layout="@layout/fragment_groups" />-->
 
     <fragment
         android:id="@+id/nav_settings"
