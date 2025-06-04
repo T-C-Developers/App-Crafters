@@ -8,7 +8,6 @@ import android.view.inputmethod.EditorInfo
 import androidx.annotation.RequiresPermission
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
-import androidx.lifecycle.observe
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.quickconnect.core.BluetoothService
 import com.example.quickconnect.core.Packet.MessagePacket
@@ -19,7 +18,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 class ChatScreenActivity : AppCompatActivity() {
     private lateinit var binding: ActivityChatScreenBinding
@@ -92,6 +90,10 @@ class ChatScreenActivity : AppCompatActivity() {
                 sendMessage(); true
             } else false
         }
+
+        binding.btnAttach.setOnClickListener {
+            ImageSendDialogFragment(peerId).show(supportFragmentManager, "ImageSendDialog")
+        }
     }
 
     private fun sendMessage() {
@@ -103,6 +105,7 @@ class ChatScreenActivity : AppCompatActivity() {
             receiverId = peerId,
             timestamp  = System.currentTimeMillis(),
             content    = text,
+            fileUri = null,
             isRead     = false
         )
 
@@ -117,7 +120,8 @@ class ChatScreenActivity : AppCompatActivity() {
                 senderId   = localUserId,
                 receiverId = peerId,
                 timestamp  = dm.timestamp,
-                content    = dm.content
+                content    = dm.content.orEmpty(),
+                imageBase64 = null
             )
         )
 

@@ -47,7 +47,8 @@ sealed class Packet {
         val senderId:   String,
         val receiverId: String,
         val timestamp:  Long,
-        val content:    String
+        val content:    String?,
+        val imageBase64: String?
     ) : Packet()
 
     @KSerializable @SerialName("broadcast")
@@ -285,7 +286,7 @@ object BluetoothService {
 //        sockets.entries.removeIf { it.value.outputStream == writer }
     }
 
-    private fun saveOrGetPersonaData(){
+    fun saveOrGetPersonaData(){
 
         ioScope.launch {
             val profile = appDatabase.profileDataDAO().getProfileData()

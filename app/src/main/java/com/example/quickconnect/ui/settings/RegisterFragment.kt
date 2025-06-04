@@ -2,7 +2,9 @@ package com.example.quickconnect.ui.settings
 
 import android.app.Activity
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
 import android.view.LayoutInflater
@@ -10,10 +12,14 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.Toast
+import androidx.annotation.RequiresPermission
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import com.example.quickconnect.R
+import com.example.quickconnect.core.BluetoothService
 import com.example.quickconnect.core.ImageService
 import com.example.quickconnect.data.AppDatabase
 import com.example.quickconnect.data.ProfileData
@@ -31,6 +37,7 @@ class RegisterFragment : Fragment() {
 
     private val binding get() = _binding!!
 
+    @RequiresPermission(android.Manifest.permission.POST_NOTIFICATIONS)
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -56,6 +63,18 @@ class RegisterFragment : Fragment() {
             registerUser(userId,newName)
         }
 
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(requireContext(),android.Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED) {
+
+                ActivityCompat.requestPermissions(
+                    requireActivity(),
+                    arrayOf(android.Manifest.permission.POST_NOTIFICATIONS),
+                    1001
+                )
+            }
+        }
+
         return root
     }
 
@@ -64,6 +83,7 @@ class RegisterFragment : Fragment() {
             val profileImagePath = "ProfilePictures/$userId.jpg"
             val profileData = ProfileData(userId=userId, displayName =newName,profileImagePath=profileImagePath)
             profileDao.insertOrUpdateProfileData(profileData)
+            BluetoothService.saveOrGetPersonaData()
             findNavController().navigate(R.id.nav_chats)
         }
     }

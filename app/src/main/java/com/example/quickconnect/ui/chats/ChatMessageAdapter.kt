@@ -6,6 +6,7 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
+import com.bumptech.glide.Glide
 import com.example.quickconnect.R
 import com.example.quickconnect.data.DirectMessage
 import java.text.SimpleDateFormat
@@ -61,6 +62,7 @@ class ChatMessageAdapter(
         private val tvMsg: TextView = view.findViewById(R.id.tvMsg)
         private val tvTime: TextView = view.findViewById(R.id.tvTime)
         private val ivTicks: ImageView = view.findViewById(R.id.ivTicks)
+        private val ivImage: ImageView = view.findViewById(R.id.ivImage)
 
         fun bind(msg: DirectMessage, timeText: String) {
             tvMsg.text = msg.content
@@ -69,16 +71,33 @@ class ChatMessageAdapter(
             ivTicks.setImageResource(
                 if (msg.isRead) R.drawable.icon_2_ticks else R.drawable.icon_1_tick
             )
+            if (!msg.fileUri.isNullOrEmpty()) {
+                ivImage.visibility = View.VISIBLE
+                Glide.with(itemView.context)
+                    .load(msg.fileUri)
+                    .into(ivImage)
+            } else {
+                ivImage.visibility = View.GONE
+            }
         }
     }
 
     private inner class ReceivedViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         private val tvMsg: TextView = view.findViewById(R.id.tvMsg)
         private val tvTime: TextView = view.findViewById(R.id.tvTime)
+        private val ivImage: ImageView = view.findViewById(R.id.ivImage)
 
         fun bind(msg: DirectMessage, timeText: String) {
             tvMsg.text = msg.content
             tvTime.text = timeText
+            if (!msg.fileUri.isNullOrEmpty()) {
+                ivImage.visibility = View.VISIBLE
+                Glide.with(itemView.context)
+                    .load(msg.fileUri)
+                    .into(ivImage)
+            } else {
+                ivImage.visibility = View.GONE
+            }
         }
     }
 }
