@@ -62,7 +62,13 @@ class ChatMessageAdapter(
         private val tvFile: TextView? = view.findViewById(R.id.tvFile) // added to support file messages
 
         fun bind(msg: DirectMessage, timeText: String) {
-            tvMsg.text = msg.content
+            if (msg.content?.isEmpty() == false) {
+                tvMsg.visibility = View.VISIBLE
+                tvMsg.text = msg.content
+            } else {
+                tvMsg.visibility = View.GONE
+            }
+
             tvTime.text = timeText
 
             // Set ticks only for sent messages

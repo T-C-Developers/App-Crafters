@@ -23,14 +23,6 @@
             android:layout_marginTop="4dp" />
 
         <TextView
-            android:id="@+id/tvMsg"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textColor="#fff"
-            android:textSize="16sp"
-            android:layout_marginTop="4dp" />
-
-        <TextView
             android:id="@+id/tvFile"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -39,6 +31,15 @@
             android:textSize="15sp"
             android:layout_marginTop="8dp"
             android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/tvMsg"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#fff"
+            android:textSize="16sp"
+            android:layout_marginTop="4dp" />
+
     </LinearLayout>
 
     <LinearLayout

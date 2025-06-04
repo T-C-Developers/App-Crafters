@@ -100,12 +100,7 @@ class ChatScreenActivity : AppCompatActivity() {
         }
 
         binding.btnAttach.setOnClickListener {
-            val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
-                type = "*/*"
-                putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("application/pdf", "text/plain"))
-            }
-            startActivityForResult(intent, REQUEST_CODE_PICK_FILE)
-//            ImageSendDialogFragment(peerId).show(supportFragmentManager, "ImageSendDialog")
+            ImageSendDialogFragment(peerId).show(supportFragmentManager, "ImageSendDialog")
         }
     }
 
@@ -141,60 +136,6 @@ class ChatScreenActivity : AppCompatActivity() {
 
         // 3) clear input
         binding.etMessage.text?.clear()
-    }
-
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-
-        if (requestCode == REQUEST_CODE_PICK_FILE && resultCode == Activity.RESULT_OK) {
-            data?.data?.let { uri ->
-                contentResolver.openInputStream(uri)?.use { inputStream ->
-                    val fileBytes = inputStream.readBytes()
-                    val fileBase64 = Base64.encodeToString(fileBytes, Base64.DEFAULT)
-                    val fileName = getFileName(uri)
-                    val fileType = contentResolver.getType(uri) ?: "application/octet-stream"
-
-                    val timestamp = System.currentTimeMillis()
-
-                    val dm = DirectMessage(
-                        senderId = localUserId,
-                        receiverId = peerId,
-                        timestamp = timestamp,
-                        content = null,
-                        fileUri = uri.toString(),
-                        fileName = "temp",
-                        isRead = false
-                    )
-
-                    lifecycleScope.launch(Dispatchers.IO) {
-                        msgDao.insert(dm)
-                    }
-
-                    BluetoothService.sendPacket(
-                        MessagePacket(
-                            senderId = localUserId,
-                            receiverId = peerId,
-                            timestamp = timestamp,
-                            fileName = fileName,
-                            fileMimeType = fileType,
-                            fileBase64 = fileBase64
-                        )
-                    )
-                }
-            }
-        }
-    }
-
-    @SuppressLint("Range")
-    private fun getFileName(uri: Uri): String {
-        var name = "unknown"
-        val cursor = contentResolver.query(uri, null, null, null, null)
-        cursor?.use {
-            if (it.moveToFirst()) {
-                name = it.getString(it.getColumnIndex(OpenableColumns.DISPLAY_NAME))
-            }
-        }
-        return name
     }
 
     override fun onOptionsItemSelected(item: MenuItem) =
