@@ -66,7 +66,7 @@ class QuickConnectApp : Application() {
                             )
                         )
 
-                        val delay = pkt.timestamp + 60*60_000 - now
+                        val delay = pkt.timestamp + 180*60_000 - now        // 3h
                         OneTimeWorkRequestBuilder<CleanupBroadcastWorker>()
                             .setInitialDelay(delay, TimeUnit.MILLISECONDS)
                             .setInputData(workDataOf("id" to newId))
@@ -90,7 +90,7 @@ class QuickConnectApp : Application() {
                         // Handle image
                         pkt.imageBase64 != null -> {
                             val bytes = android.util.Base64.decode(pkt.imageBase64, android.util.Base64.NO_WRAP)
-                            val file = File(applicationContext.cacheDir, "image_${pkt.timestamp}.jpg")
+                            val file = File(applicationContext.filesDir, "image_${pkt.timestamp}.jpg")
                             file.outputStream().use { it.write(bytes) }
                             Uri.fromFile(file).toString()
                         }
@@ -103,7 +103,7 @@ class QuickConnectApp : Application() {
                             } ?: "pdf"
 
                             val bytes = android.util.Base64.decode(pkt.fileBase64, android.util.Base64.NO_WRAP)
-                            val file = File(applicationContext.cacheDir, "file_${pkt.timestamp}.$safeExt")
+                            val file = File(applicationContext.filesDir, "file_${pkt.timestamp}.$safeExt")
                             file.outputStream().use { it.write(bytes) }
                             Uri.fromFile(file).toString()
                         }
